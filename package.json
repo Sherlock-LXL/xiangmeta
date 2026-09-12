@@ -1,0 +1,69 @@
+{
+  "name": "xiangmeta",
+  "version": "1.0.0",
+  "private": true,
+  "description": "XiangMeta - A personal AI universe",
+  "author": "XiangMeta",
+  "type": "module",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "tsc --noEmit && vite build",
+    "start": "node backend/server.mjs",
+    "desktop": "electron .",
+    "dist:win": "npm run build && electron-builder --win portable --x64",
+    "test": "node --test tests/*.test.mjs",
+    "test:ui": "node tests/browser.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "module:new": "node scripts/new-module.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5",
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12",
+    "playwright": "^1.55.0"
+  },
+  "build": {
+    "appId": "world.xiangmeta.desktop",
+    "productName": "XiangMeta",
+    "directories": {
+      "output": "build/staging"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/**/*",
+      "backend/**/*",
+      "shared/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "modules",
+        "to": "modules"
+      },
+      {
+        "from": "data",
+        "to": "data",
+        "filter": [
+          "**/*",
+          "!local.json"
+        ]
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "desktop/icon.ico",
+      "signExecutable": false
+    },
+    "portable": {
+      "unpackDirName": true
+    },
+    "artifactName": "XiangMeta-${version}-${arch}.${ext}"
+  }
+}
