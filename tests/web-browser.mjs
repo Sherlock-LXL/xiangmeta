@@ -29,7 +29,11 @@ try{
     try{
       const context=await browser.newContext({viewport:{width:1440,height:1000}});
       const page=await context.newPage(),errors=[],requests=[],failures=[];
-      const activate=async locator=>{await locator.focus();await page.keyboard.press('Enter');};
+      const activate=async locator=>{
+        await page.evaluate(()=>document.pointerLockElement&&document.exitPointerLock());
+        await page.waitForFunction(()=>!document.pointerLockElement);
+        await locator.press('Enter');
+      };
       page.on('pageerror',e=>errors.push(e.message));
       page.on('request',r=>requests.push(r.url()));
       page.on('response',r=>{if(r.status()>=400)failures.push(`${r.status()} ${r.url()}`);});
@@ -168,6 +172,7 @@ try{
       checkpoint('Both research Workers respond to parameter changes');
       const catalog=JSON.parse(await readFile(path.join(root,'content/world.json'),'utf8'));
       for(const m of catalog.modules){
+        checkpoint(`Checking exhibit ${m.id}`);
         await activate(page.locator('#collections'));await activate(page.locator(`[data-exhibit="${m.id}"]`));
         await activate(page.locator('#visit'));await page.keyboard.press('Escape');
         await page.waitForFunction(title=>document.querySelector('#interaction-prompt:not([hidden]) .nearby-copy b')?.textContent===title,m.portfolio.name,{timeout:15000});
