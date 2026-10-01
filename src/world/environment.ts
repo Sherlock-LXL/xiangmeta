@@ -38,7 +38,7 @@ export class Environment {
     this.halo=new T.Sprite(new T.SpriteMaterial({map:haloTexture,transparent:true,depthWrite:false,fog:false,toneMapped:false}));this.halo.renderOrder=-30;this.halo.scale.set(24,24,1);scene.add(this.halo);
     this.light.castShadow=true;this.light.shadow.mapSize.set(renderSettings.shadowSize,renderSettings.shadowSize);
     Object.assign(this.light.shadow.camera,{left:-63,right:63,top:63,bottom:-63,near:.5,far:230});
-    this.light.shadow.bias=-.0005;this.light.shadow.normalBias=.06;
+    this.light.shadow.bias=-.00025;this.light.shadow.normalBias=.035;this.light.shadow.radius=2;
     // Fine translucent crater basins stay on the moon's near hemisphere.
     const craterMaterial=new T.MeshBasicMaterial({color:'#b6c9e4',transparent:true,opacity:.35,fog:false,depthWrite:false});
     for(const [x,y,r] of [[-.7,.6,.42],[.65,-.45,.55],[.8,.95,.25],[-.85,-.75,.3]]){
@@ -55,13 +55,20 @@ export class Environment {
       fragmentShader:`uniform float time,day;uniform vec3 sunDirection;uniform vec3 shores[${shores.length}];varying vec3 vWorld;
       void main(){vec2 p=vWorld.xz;float shore=1000.;for(int i=0;i<${shores.length};i++){shore=min(shore,length(p-shores[i].xy)-shores[i].z);}
         float wave=sin(p.x*.55+p.y*.24+time*.65)*sin(p.y*.38-p.x*.15-time*.45);
-        vec3 deep=mix(vec3(.037,.085,.14),vec3(.035,.28,.52),day);
-        vec3 shallow=mix(vec3(.085,.19,.23),vec3(.12,.60,.68),day);
-        vec3 c=mix(deep,shallow,exp(-max(shore,0.)*.13)*.7+.12)+wave*.004;
-        float foam=pow(.5+.5*sin(shore*2.2-time*.6),12.)*exp(-abs(shore-1.3)*.7)*.15;
-        vec3 normal=normalize(vec3(cos(p.x*.55+time*.4)*.07,1.,sin(p.y*.38-time*.4)*.07));
-        vec3 eye=normalize(cameraPosition-vWorld);float glint=pow(max(dot(reflect(-sunDirection,normal),eye),0.),70.);
-        c+=foam*mix(vec3(.18,.3,.33),vec3(.62,.87,.93),day)+glint*.035;
+        vec3 deep=mix(vec3(.018,.045,.09),vec3(.022,.20,.32),day);
+        vec3 shallow=mix(vec3(.045,.13,.16),vec3(.11,.53,.49),day);
+        float shelf=exp(-max(shore,0.)*.15);
+        vec3 c=mix(deep,shallow,shelf*.8+.08)+wave*.006;
+        float irregular=sin(p.x*.43+p.y*.31)+sin(p.y*.62-p.x*.19)*.5;
+        float foam=pow(.5+.5*sin(shore*2.5+irregular*.7-time*.8),9.)*exp(-abs(shore-.5)*.8)*.25;
+        vec3 normal=normalize(vec3(cos(p.x*.55+p.y*.24+time*.65)*.075,1.,sin(p.y*.38-p.x*.15-time*.45)*.08));
+        vec3 eye=normalize(cameraPosition-vWorld);
+        float fresnel=.025+.45*pow(1.-max(dot(eye,normal),0.),4.);
+        vec3 sky=mix(vec3(.09,.13,.23),vec3(.37,.64,.77),day);
+        c=mix(c,sky,fresnel);
+        float glint=pow(max(dot(reflect(-sunDirection,normal),eye),0.),150.);
+        float caustic=pow(max(0.,sin(p.x*1.8+wave)*sin(p.y*1.7-wave)),8.)*shelf*.018*day;
+        c+=foam*mix(vec3(.18,.3,.33),vec3(.7,.87,.82),day)+glint*.19+caustic;
         float haze=1.-exp(-length(cameraPosition-vWorld)*.0010);c=mix(c,mix(vec3(.08,.12,.21),vec3(.28,.58,.78),day),haze);
         gl_FragColor=vec4(c,1.);
         #include <tonemapping_fragment>
@@ -93,11 +100,11 @@ export class Environment {
     this.sun.material.color.set('#fff1cf').lerp(this.color.set('#f2ac90'),twilight*.65);
     this.light.position.copy(state.altitude>=0?this.sun.position:this.moon.position).normalize().multiplyScalar(95);
     // Change the shadow source only while its contribution has faded to zero.
-    this.light.intensity=(state.sun*1.65+state.moon*.65)*(1-weather.shade*.64)*T.MathUtils.smoothstep(Math.abs(state.altitude),0,.04);
+    this.light.intensity=(state.sun*2.65+state.moon*.8)*(1-weather.shade*.64)*T.MathUtils.smoothstep(Math.abs(state.altitude),0,.04);
     this.sun.material.opacity=this.moon.material.opacity=1-weather.shade*.98;this.halo.material.opacity=1-weather.cover;
     const solar=T.MathUtils.smoothstep(state.altitude,-.04,.04);
     this.light.color.set('#bdcdf1').lerp(this.color.set('#fff0dd').lerp(new T.Color('#efb6a0'),twilight*.5),solar);
-    this.ambient.intensity=.83+day*.9;this.ambient.color.set('#99add7').lerp(this.color.set('#e7eff6'),day);this.ambient.groundColor.set('#687e9b').lerp(this.color.set('#b7c6ba'),day);
+    this.ambient.intensity=.58+day*.52;this.ambient.color.set('#99add7').lerp(this.color.set('#dbeaf5'),day);this.ambient.groundColor.set('#526a83').lerp(this.color.set('#9faf9b'),day);
     this.ambient.color.lerp(this.color.set('#edc9bd'),twilight*.4);
     const horizon=this.skyMaterial.uniforms.horizon.value as T.Color;
     horizon.set('#657caa').lerp(this.color.set('#b5ddf4'),day).lerp(this.color.set('#edbeae'),twilight*.55);

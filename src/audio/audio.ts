@@ -1,70 +1,96 @@
-import type { EventBus } from '../core/events';
-import type {Catalog} from '../core/types';
+import type {EventBus} from '../core/events';
+import type {MusicManifest,MusicTrack} from '../core/types';
 import {MusicProgramme} from '../../shared/music-programme.mjs';
-import {connectMedia,disconnectMedia} from './media-mixer';
-type Channel='ambient'|'music'|'ui'|'interaction';
-interface Track {id:string;title:string;src:string}
-interface Manifest {volume:Record<Channel,number>;tracks:Record<Channel,string|null>;regions:Record<string,string>;playlist?:Track[];seasonal?:Record<string,Track>}
+type Selection={kind:string;track:MusicTrack};
+type Deck={element:HTMLAudioElement;source:MediaElementAudioSourceNode;gain:GainNode;selection:Selection;started:boolean};
+const journeyKey='xiangmeta:seasonal-music:v1';
+/** No media element or MP3 request until a deliberate sound-button click. */
 export class AudioSystem {
-  private context?:AudioContext;private manifest?:Manifest;private muted=true;
-  private players=new Map<Channel,HTMLAudioElement>();private region='';
-  private voices=new Set<OscillatorNode>();
-  private regionalAudio=new Map<string,string>();private nearbyAudio?:string;private fades=new Map<HTMLAudioElement,number>();
-  private programme?:MusicProgramme;private loading?:Promise<void>;private exhibition=false;private disposed=false;private unsubscribers:(()=>void)[]=[];
-  constructor(bus:EventBus,catalog?:Catalog,private status:(text:string)=>void=()=>{}){this.region=catalog?.regions[0]?.id??'';for(const m of catalog?.modules??[])if(m.world?.audio&&!this.regionalAudio.has(m.region))this.regionalAudio.set(m.region,m.world.audio);this.unsubscribers.push(bus.on('sound',kind=>this.play(kind)),bus.on('melody',notes=>this.melody(notes)),bus.on('region',id=>{this.region=id;this.nearbyAudio=undefined;this.background();}),bus.on('nearby',m=>{this.nearbyAudio=m?.world?.audio;this.background();}));}
-  private publish(){const current=this.programme?.current;this.status(this.muted?'音乐已静音 · 点击右上角 ♪ 开启':this.exhibition?'正在试听个人作品':current?`${current.kind==='seasonal'?'四季首演':'伴奏电台'} · ${current.track.title}`:'音乐暂时不可用');}
-  setExhibition(active:boolean){this.exhibition=active;if(active){this.stopFades();this.players.forEach(p=>p.pause());}else this.background();this.publish();}
-  private fade(player:HTMLAudioElement,volume:number,stop=false){
-    const existing=this.fades.get(player);if(existing)clearInterval(existing);const start=performance.now(),initial=player.volume;
-    const timer=window.setInterval(()=>{const t=Math.min(1,(performance.now()-start)/1200);player.volume=initial+(volume-initial)*(t*t*(3-2*t));if(t===1){clearInterval(timer);this.fades.delete(player);if(stop){player.pause();disconnectMedia(player);}}},40);this.fades.set(player,timer);
-  }
-  private stopFades(){this.fades.forEach((timer,player)=>{clearInterval(timer);player.pause();disconnectMedia(player);});this.fades.clear();}
-  private melody(notes:number[]){
-    if(this.muted||!this.context)return;
-    const ctx=this.context;
-    notes.slice(0,8).forEach((frequency,i)=>{
-      const oscillator=ctx.createOscillator(),gain=ctx.createGain(),start=ctx.currentTime+i*.18;
-      oscillator.type='sine';oscillator.frequency.value=frequency;
-      gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime((this.manifest?.volume.interaction??.1)*.55,start+.015);gain.gain.exponentialRampToValueAtTime(.0001,start+1.3);
-      oscillator.connect(gain);gain.connect(ctx.destination);this.voices.add(oscillator);oscillator.start(start);oscillator.stop(start+1.35);
-      oscillator.onended=()=>{this.voices.delete(oscillator);oscillator.disconnect();gain.disconnect();};
-    });
+  private context?:AudioContext;private muted=true;private voices=new Set<OscillatorNode>();
+  private programme:MusicProgramme;private region='nexus';private active?:Deck;private outgoing?:Deck;
+  private fadeTimer?:ReturnType<typeof setTimeout>;private disposed=false;private events=new AbortController();
+  private unsubscribers:(()=>void)[];
+  constructor(bus:EventBus,manifest:MusicManifest={playlist:[],seasonal:{}},private report=(text:string,playing:boolean)=>{void text;void playing;}){
+    let heard:string[]=[];try{const value=JSON.parse(sessionStorage.getItem(journeyKey)??'[]');if(Array.isArray(value))heard=value.filter(x=>typeof x==='string');}catch{}
+    this.programme=new MusicProgramme(manifest,heard);
+    this.unsubscribers=[bus.on('sound',kind=>this.tone(kind==='ui'?540:720,.02,.18)),
+      bus.on('melody',notes=>notes.slice(0,8).forEach((note,i)=>this.tone(note,.035,1.3,i*.18))),
+      bus.on('region',id=>{this.region=id;if(!this.muted&&!document.hidden)void this.play().catch(()=>this.report('点击声音按钮重试',false));})];
+    document.addEventListener('visibilitychange',()=>{
+      if(document.hidden){this.pause();void this.context?.suspend();}
+      else if(!this.muted){void this.context?.resume();void this.play().catch(()=>this.report('点击声音按钮重试',false));}
+    },{signal:this.events.signal});
   }
   async setMuted(muted:boolean){
-    this.muted=muted;this.publish();if(muted){this.stopFades();this.players.forEach(p=>p.pause());this.voices.forEach(v=>v.stop());this.voices.clear();await this.context?.suspend();return;}
-    this.context??=new AudioContext();void this.context.resume().catch(()=>{});
-    if(!this.manifest){this.loading??=(async()=>{const response=await fetch('/assets/audio/manifest.json',{cache:'no-cache'});if(!response.ok)throw new Error('音频清单不可用');this.manifest=await response.json();let heard:string[]=[];try{const saved=JSON.parse(sessionStorage.getItem('xiangmeta:seasonal-journey:v2')??'[]');if(Array.isArray(saved))heard=saved.filter((id:unknown)=>typeof id==='string');}catch{}this.programme=new MusicProgramme(this.manifest,heard);})();try{await this.loading;}catch(error){this.loading=undefined;throw error;}}
-    this.background();this.play('ui');
+    this.muted=muted;
+    if(muted){this.pause();this.voices.forEach(v=>v.stop());this.voices.clear();this.report('音乐已暂停 · 点击 ♪ 继续',false);await this.context?.suspend();return;}
+    this.context??=new AudioContext();
+    // Both calls run inside the click's activation, before any await.
+    const resume=this.context.resume(),play=this.play();
+    try{await Promise.all([resume,play]);}
+    catch(error){this.muted=true;this.pause();this.report('音乐暂不可用 · 点击 ♪ 重试',false);throw error;}
   }
-  private background(){
-    if(this.muted||!this.manifest||this.exhibition||this.disposed)return;
-    // An ended event can be queued behind a proximity/region event. Retire its
-    // selection before choosing, otherwise the same finished track is recreated.
-    const finished=this.players.get('music');if(finished?.ended){if(this.programme?.current)this.programme.end(this.programme.current);this.players.delete('music');}
-    for(const channel of ['ambient'] as const){
-      const src=this.nearbyAudio??this.regionalAudio.get(this.region)??this.manifest.tracks.ambient;
-      const old=this.players.get(channel);
-      if(!src){if(old)this.fade(old,0,true);this.players.delete(channel);continue;}
-      if(old?.getAttribute('src')===src){connectMedia(old);void old.play().catch(()=>{});this.fade(old,this.manifest.volume[channel]);continue;}
-      if(old)this.fade(old,0,true);const player=new Audio(src);player.loop=true;player.volume=0;connectMedia(player);this.players.set(channel,player);void player.play().then(()=>{if(!this.muted&&this.players.get(channel)===player)this.fade(player,this.manifest!.volume[channel]);else player.pause();}).catch(()=>{});
+  private pause(){this.active?.element.pause();this.clearOutgoing();}
+  private clearOutgoing(){clearTimeout(this.fadeTimer);if(this.outgoing)this.release(this.outgoing);this.outgoing=undefined;}
+  private release(deck:Deck){
+    deck.element.onended=null;deck.element.onerror=null;deck.element.pause();
+    deck.element.removeAttribute('src');deck.element.load();deck.source.disconnect();deck.gain.disconnect();
+  }
+  private level(deck:Deck){return .62*(deck.selection.track.gain??1);}
+  private async play():Promise<void>{
+    if(this.muted||this.disposed||document.hidden||!this.context)return;
+    const selection=this.programme.choose(this.region) as Selection|null;
+    if(!selection){this.report('音乐暂不可用 · 风铃与音效已开启',false);return;}
+    if(this.active?.selection===selection){
+      const deck=this.active;
+      if(!deck.element.paused)return;
+      await deck.element.play();
+      if(this.active===deck&&!this.muted&&!document.hidden)this.started(deck);
+      return;
     }
-    const selection=this.programme?.choose(this.region);if(!selection){this.publish();return;}
-    const old=this.players.get('music');if(old&&old.getAttribute('src')===selection.track.src&&!old.ended){connectMedia(old);void old.play().catch(()=>{});this.fade(old,this.manifest.volume.music);this.publish();return;}
-    if(old)this.fade(old,0,true);
-    const player=new Audio(selection.track.src);player.preload='metadata';player.loop=selection.kind==='legacy';player.volume=0;connectMedia(player);this.players.set('music',player);
-    const current=()=>this.players.get('music')===player&&!this.muted&&!this.exhibition&&!this.disposed;
-    player.addEventListener('playing',()=>{if(!current()){player.pause();return;}this.programme!.started(selection);try{sessionStorage.setItem('xiangmeta:seasonal-journey:v2',JSON.stringify([...this.programme!.heard]));localStorage.setItem('xiangmeta:seasonal-music:v1',JSON.stringify([...this.programme!.heard]));}catch{}this.fade(player,this.manifest!.volume.music);this.publish();});
-    player.addEventListener('ended',()=>{disconnectMedia(player);if(this.players.get('music')!==player)return;this.programme!.end(selection);this.players.delete('music');this.background();});
-    const failed=()=>{if(this.players.get('music')!==player)return;player.pause();this.programme!.fail(selection);this.players.delete('music');this.background();};
-    player.addEventListener('error',failed,{once:true});
-    void player.play().catch(error=>{if(error.name==='NotAllowedError'){this.status('音乐已开启 · 点击世界后开始播放');return;}if(error.name!=='AbortError')failed();});this.publish();
+    this.clearOutgoing();
+    const ctx=this.context,element=new Audio();element.preload='none';element.src=selection.track.src;
+    const source=ctx.createMediaElementSource(element),gain=ctx.createGain();source.connect(gain);gain.connect(ctx.destination);gain.gain.value=0;
+    const deck:Deck={element,source,gain,selection,started:false};
+    this.outgoing=this.active;this.active=deck;
+    // Stale pending loads never mark a seasonal premiere heard.
+    element.onended=()=>{if(this.active!==deck)return;this.programme.end(selection);this.active=undefined;this.release(deck);void this.play().catch(()=>{});};
+    const failed=()=>{if(this.active!==deck)return;this.programme.fail(selection);this.active=this.outgoing;this.outgoing=undefined;this.release(deck);void this.play().catch(()=>{});};
+    element.onerror=failed;
+    this.report(`正在载入 · ${selection.track.title}`,false);
+    try{
+      await element.play();
+      if(this.active!==deck||this.muted||this.disposed||document.hidden)return;
+      this.started(deck);
+      if(this.outgoing){
+        const old=this.outgoing;old.gain.gain.cancelScheduledValues(ctx.currentTime);
+        old.gain.gain.setValueAtTime(old.gain.gain.value,ctx.currentTime);old.gain.gain.linearRampToValueAtTime(0,ctx.currentTime+1.2);
+        this.fadeTimer=setTimeout(()=>{if(this.outgoing===old)this.clearOutgoing();},1300);
+      }
+    }catch(error){
+      if(this.active!==deck||this.muted||this.disposed||document.hidden)return;
+      if((error as DOMException).name==='NotAllowedError')throw error;
+      failed();
+    }
   }
-  private play(channel:'ui'|'interaction'){
+  private started(deck:Deck){
+    const ctx=this.context!;deck.gain.gain.cancelScheduledValues(ctx.currentTime);
+    deck.gain.gain.setValueAtTime(deck.gain.gain.value,ctx.currentTime);
+    deck.gain.gain.linearRampToValueAtTime(this.level(deck),ctx.currentTime+.8);
+    if(!deck.started){deck.started=true;this.programme.started(deck.selection);try{sessionStorage.setItem(journeyKey,JSON.stringify([...this.programme.heard]));}catch{}}
+    this.report(`${deck.selection.kind==='seasonal'?'四季':'BGM'} · ${deck.selection.track.title}`,true);
+  }
+  get snapshot(){
+    return {muted:this.muted,region:this.region,track:this.active?.selection.track.id??null,time:this.active?.element.currentTime??0,
+      playing:!!this.active&&!this.active.element.paused,heard:[...this.programme.heard],context:this.context?.state??'uninitialized'};
+  }
+  private tone(frequency:number,volume:number,duration:number,delay=0){
     if(this.muted||!this.context)return;
-    const source=this.manifest?.tracks[channel];if(source){const audio=new Audio(source);audio.volume=this.manifest!.volume[channel];connectMedia(audio);audio.addEventListener('ended',()=>disconnectMedia(audio),{once:true});void audio.play().catch(()=>{});return;}
-    const oscillator=this.context.createOscillator(),gain=this.context.createGain();oscillator.type='sine';oscillator.frequency.value=channel==='ui'?540:720;
-    gain.gain.setValueAtTime(.0001,this.context.currentTime);gain.gain.linearRampToValueAtTime(this.manifest?.volume[channel]??.02,this.context.currentTime+.018);gain.gain.exponentialRampToValueAtTime(.0001,this.context.currentTime+.16);
-    oscillator.connect(gain);gain.connect(this.context.destination);oscillator.start();oscillator.stop(this.context.currentTime+0.18);oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();};
+    const ctx=this.context,voice=ctx.createOscillator(),gain=ctx.createGain(),start=ctx.currentTime+delay;
+    voice.type='sine';voice.frequency.value=frequency;gain.gain.setValueAtTime(.0001,start);
+    gain.gain.linearRampToValueAtTime(volume,start+.018);gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
+    voice.connect(gain);gain.connect(ctx.destination);this.voices.add(voice);voice.start(start);voice.stop(start+duration+.02);
+    voice.onended=()=>{this.voices.delete(voice);voice.disconnect();gain.disconnect();};
   }
-  dispose(){this.disposed=true;this.muted=true;this.unsubscribers.forEach(f=>f());this.stopFades();this.players.forEach(p=>{p.pause();p.removeAttribute('src');p.load();});this.voices.forEach(v=>v.stop());this.voices.clear();void this.context?.close();}
+  dispose(){this.disposed=true;this.muted=true;this.events.abort();this.unsubscribers.forEach(f=>f());this.clearOutgoing();if(this.active)this.release(this.active);this.active=undefined;this.voices.forEach(v=>v.stop());this.voices.clear();void this.context?.close();}
 }

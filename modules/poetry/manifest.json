@@ -1,6 +1,14 @@
 {
   "schemaVersion": 1,
   "id": "poetry",
+  "portfolio": {
+    "name": "Blind Verse",
+    "category": "AI",
+    "summary": "字符级 LSTM 从两个独立起点采样，让不共享上下文的两句诗偶然相遇。",
+    "technologies": ["PyTorch", "LSTM", "Generative Art"],
+    "github": "https://github.com/Sherlock-LXL/blind-verse-rnn",
+    "order": 4
+  },
   "title": "双盲诗花园",
   "subtitle": "让两个互不相识的句子相遇",
   "region": "ai-mountain",

@@ -1,6 +1,14 @@
 {
   "schemaVersion": 1,
   "id": "emotion-recognition",
+  "portfolio": {
+    "name": "FER2013 · Expression Recognition",
+    "category": "AI",
+    "summary": "手工实现轻量残差 CNN，通过三个独立模型的 soft-voting 识别七类面部表情。",
+    "technologies": ["PyTorch", "Residual CNN", "FER2013"],
+    "github": "https://github.com/Sherlock-LXL/expression-recognition-cnn",
+    "order": 3
+  },
   "title": "镜子房间",
   "subtitle": "让神经网络看见表情",
   "region": "ai-mountain",

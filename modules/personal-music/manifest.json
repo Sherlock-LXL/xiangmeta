@@ -1,6 +1,14 @@
 {
   "schemaVersion": 1,
   "id": "personal-music",
+  "portfolio": {
+    "name": "个人音乐档案",
+    "category": "Creative",
+    "summary": "Secret、星辰代我想你、近地轨道、二分之一星球：把写过的旋律，放进时间里。",
+    "technologies": ["Songwriting", "Music Production"],
+    "demo": "https://music.163.com/#/artist?id=46962347",
+    "order": 8
+  },
   "title": "旋律展廊",
   "subtitle": "把每一张专辑，放进时间里",
   "region": "personal-museum",
@@ -11,7 +19,7 @@
   ],
   "owner": "personal",
   "category": "COLLECTION",
-  "description": "五张按档案编号排列的专辑，收录封面、精选人声作品与原始歌词及制作署名。《燕来有声》单独标注未名拾音团队归属；曲目为提供的精选作品，不代表完整专辑曲序。",
+  "description": "四张个人专辑与《燕来有声》团队作品档案。浏览封面、曲目和制作署名，前往网易云音乐收听个人作品，或在哔哩哔哩观看完整 MV。",
   "tags": [
     "个人作品",
     "人声",
@@ -23,8 +31,8 @@
       "value": "5 张"
     },
     {
-      "label": "精选人声作品",
-      "value": "12 首"
+      "label": "个人专辑",
+      "value": "4 张"
     },
     {
       "label": "顺序依据",
@@ -38,7 +46,7 @@
     },
     {
       "title": "02 / 听见与阅读",
-      "body": "选择专辑后试听精选曲目，阅读随档案提供的歌词与制作署名。"
+      "body": "选择专辑后查看曲目档案，前往网易云音乐收听完整专辑。"
     },
     {
       "title": "03 / 创作归属",
@@ -56,6 +64,7 @@
   "albums": [
     {
       "id": "album-01",
+      "link": "https://music.163.com/#/album?id=172971428",
       "order": 1,
       "title": "Secret",
       "cover": "/assets/modules/personal-music/album-01.webp",
@@ -83,6 +92,7 @@
     },
     {
       "id": "album-02",
+      "link": "https://music.163.com/#/album?id=181322022",
       "order": 2,
       "title": "星辰代我想你",
       "cover": "/assets/modules/personal-music/album-02.webp",
@@ -98,6 +108,7 @@
     },
     {
       "id": "album-03",
+      "link": "https://music.163.com/#/album?id=249590756",
       "order": 3,
       "title": "近地轨道",
       "cover": "/assets/modules/personal-music/album-03.webp",
@@ -125,6 +136,7 @@
     },
     {
       "id": "album-04",
+      "link": "https://music.163.com/#/album?id=286933696",
       "order": 4,
       "title": "二分之一星球",
       "cover": "/assets/modules/personal-music/album-04.webp",
@@ -158,6 +170,7 @@
     },
     {
       "id": "album-05",
+      "link": "https://www.bilibili.com/video/BV1kCTX6uEf7/",
       "order": 5,
       "title": "燕来有声",
       "cover": "/assets/modules/personal-music/album-05.webp",

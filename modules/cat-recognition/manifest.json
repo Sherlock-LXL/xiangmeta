@@ -1,6 +1,15 @@
 {
   "schemaVersion": 1,
   "id": "cat-recognition",
+  "portfolio": {
+    "name": "PKU Cat Recognition",
+    "category": "AI",
+    "summary": "从检测、裁切到个体识别，让校园里每一次与猫咪的相遇，都能找到名字。",
+    "technologies": ["PyTorch", "YOLO", "ResNet", "ConvNeXt"],
+    "github": "https://github.com/Sherlock-LXL/pku-cat-recognition",
+    "featured": true,
+    "order": 2
+  },
   "title": "猫咪森林",
   "subtitle": "在校园里，认出每一个独特的它",
   "region": "ai-mountain",

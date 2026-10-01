@@ -1,9 +1,9 @@
-import {researchCamp} from './research-camp';
 import * as T from 'three';
 import { material,mesh,tree,softBox } from './architecture';
 import type { Exhibit,Region } from '../core/types';
 import {onRegionRoute} from '../../shared/region-routes.mjs';
 import { shoreLayout } from '../../shared/shore-layout.mjs';
+import {nearParkEntrance} from '../../shared/park-layout.mjs';
 import {flowerDrifts,type FlowerPoint} from './garden-details';
 import {seasonalColors,palm} from './season-style';
 export type Obstacle={x:number;z:number;radius:number;halfX?:number;halfZ?:number;height?:number;segment?:[number,number,number,number]};
@@ -21,7 +21,7 @@ export function sign(g:T.Object3D,title:string,subtitle:string,color:string,widt
   if(subtitle)write(subtitle,h*.17,h*.74,400,'#647a79');
   const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;texture.anisotropy=8;texture.minFilter=T.LinearMipmapLinearFilter;
   texture.name='clear-sign-text';
-  const plaque=new T.Group();plaque.name='solid-sign';g.add(plaque);
+  const plaque=new T.Group();plaque.name='solid-sign';plaque.userData={title,subtitle};g.add(plaque);
   cube(plaque,material('#b4bbaa',.55,.12),width+.10,height+.10,.14);
   const ink=new T.MeshBasicMaterial({map:texture,toneMapped:false});
   for(const side of [-1,1]){
@@ -75,18 +75,19 @@ export function dressRegion(region:Region,exhibits:Exhibit[],obstacles:Obstacle[
   const gardenFlowers:FlowerPoint[]=[];
   const block=(x:number,z:number,radius:number,height=Infinity)=>obstacles.push({x:rx+x,z:rz+z,radius,height});
   const onPath=(x:number,z:number,margin=0)=>onRegionRoute(x,z,region,exhibits,margin);
+  const nearPublicBridge=(x:number,z:number,margin=0)=>nearParkEntrance(region.id,x,z,margin);
   const nearDiscovery=(x:number,z:number)=>!!region.discovery&&Math.hypot(x-region.discovery.position[0],z-region.discovery.position[1])<3.1;
-  if(region.season!=='winter'&&!onPath(-5,11,1.5)){flowerBed(g,region.color);block(-5,11,1.25,.85);}
+  if(region.season!=='winter'&&!onPath(-5,11,1.5)&&!nearPublicBridge(-5,11,1.5)){flowerBed(g,region.color);block(-5,11,1.25,.85);}
   // A small, optional stepping-stone route behind the arrival gate.
   for(const [i,x,z,h] of [[0,-3.8,13.1,.28],[1,-1.8,14.2,.5],[2,.4,14.5,.76],[3,2.6,13.8,.46]]){
-    if(onPath(x,z,1))continue;
+    if(onPath(x,z,1)||nearPublicBridge(x,z,1))continue;
     const plinth=mesh(g,new T.CylinderGeometry(.7,.8,h,48),i%2?stone:tint,x,h/2,z);
     const cap=mesh(g,new T.CylinderGeometry(.57,.57,.035,48),i%2?tint:stone,x,h+.018,z);cap.castShadow=false;
     plinth.receiveShadow=true;block(x,z,.8,h+.035);
   }
 
   // Paths are painted by terrain.ts; this group contains only raised furnishings.
-  for(const x of [-3.2,3.2]){if(onPath(x,10,.4)||nearDiscovery(x,10))continue;lamp(g,x,10,region.color);block(x,10,.15);}
+  for(const x of [-3.2,3.2]){if(onPath(x,10,.4)||nearPublicBridge(x,10,.8)||nearDiscovery(x,10))continue;lamp(g,x,10,region.color);block(x,10,.15);}
   if(!region.arrivalPath){
   const distance=Math.hypot(rx,rz),gateway=new T.Group();gateway.position.set(-rx/distance*(region.radius-2),0,-rz/distance*(region.radius-2));gateway.rotation.y=Math.atan2(-rx,-rz);g.add(gateway);
   const entrance=sign(gateway,region.title,region.scenery==='laboratory'?'观察 · 建模 · 探索':region.english,region.color,3.4,.8);entrance.position.set(0,4.1,.13);
@@ -112,7 +113,7 @@ export function dressRegion(region:Region,exhibits:Exhibit[],obstacles:Obstacle[
     cube(fence,tint,.055,.045,1.5,0,.8);
   }
   for(const x of [-10,10]){
-    if(onPath(x,9,1.7)||onPath(x,11,1.7))continue;
+    if(onPath(x,9,1.7)||onPath(x,11,1.7)||nearPublicBridge(x,9,1.3)||nearPublicBridge(x,11,1.3))continue;
     cube(g,stone,2.5,.17,.75,x,.55,9);for(const leg of [-.85,.85])cube(g,dark,.15,.5,.6,x+leg,.25,9);
     obstacles.push({x:rx+x,z:rz+9,radius:0,halfX:1.25,halfZ:.4,height:.72});
     const planter=cube(g,dark,1.6,.5,1.2,x,.25,11);planter.castShadow=false;
@@ -139,10 +140,7 @@ export function dressRegion(region:Region,exhibits:Exhibit[],obstacles:Obstacle[
         for(let n=0;n<3;n++){mesh(g,new T.CylinderGeometry(.018,.018,.4,6),dark,x+n*.22,.2,z);mesh(g,new T.SphereGeometry(.14,12,8),material('#efb7c4'),x+n*.22,.46,z);}}
     },
     laboratory:()=>{
-      g.add(researchCamp());
-      for(let i=0;i<5;i++)block(-9+i*4.5,-12,1.1);
-      for(const x of [-10.5,10.5])block(x,-12.8,.3);
-
+      // The domed research station is built by region-landmarks; keep this forecourt open.
     },
     museum:()=>{
       // Both galleries own their architecture; this shared forecourt stays open.

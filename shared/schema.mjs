@@ -1,6 +1,14 @@
 import { z } from 'zod';
 export const idSchema = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
 const asset = z.string().regex(/^\/assets\/[a-zA-Z0-9_./-]+$/).refine(s => !s.includes('..'));
+const externalLink = z.string().url().refine(s => s.startsWith('https://'));
+export const portfolioSchema = z.object({
+  name: z.string().min(1), category: z.enum(['AI','Research','Engineering','Creative']),
+  summary: z.string().min(1), technologies: z.array(z.string()),
+  github: externalLink.optional(), demo: externalLink.optional(),
+  featured: z.boolean().default(false), order: z.number().int().default(100),
+  screenshots: z.array(asset).default([])
+});
 export const worldModuleSchema=z.object({
   version:z.literal(1),
   capabilities:z.array(z.enum(['conversation','vision','generation','recommendation','simulation','gallery','listening'])).default([]),
@@ -31,7 +39,8 @@ export const moduleSchema = z.object({
   visualAsset: z.object({src:asset.refine(s=>s.endsWith('.glb')),scale:z.number().positive().max(100).default(1),rotation:z.number().default(0)}).optional(),
   world:worldModuleSchema.optional(),
   wayfinding:z.object({title:z.string().max(50),subtitle:z.string().max(50)}).optional(),
-  albums:z.array(z.object({id:idSchema,order:z.number().int().positive(),title:z.string(),cover:asset,credit:z.string(),tracks:z.array(z.object({id:idSchema,title:z.string(),src:asset,lyrics:z.string().max(30000)})).min(1)})).max(100).optional(),
+  portfolio:portfolioSchema.optional(),
+  albums:z.array(z.object({id:idSchema,order:z.number().int().positive(),title:z.string(),cover:asset,credit:z.string(),link:externalLink.optional(),tracks:z.array(z.object({id:idSchema,title:z.string(),src:asset.optional(),lyrics:z.string().max(30000)})).default([])})).max(100).optional(),
   facts: z.array(z.object({ label: z.string(), value: z.string() })),
   story: z.array(z.object({ title: z.string(), body: z.string() })),
   interface: z.object({ action: z.string(), fields: z.array(fieldSchema) }).optional(),

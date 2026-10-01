@@ -1,6 +1,14 @@
 {
   "schemaVersion": 1,
   "id": "weiming",
+  "portfolio": {
+    "name": "未名拾音 · 燕来有声",
+    "category": "Creative",
+    "summary": "连接校园、音乐与影像的团队创作。《燕来有声》完整 MV 可在哔哩哔哩观看。",
+    "technologies": ["Music", "Film", "Collaboration"],
+    "demo": "https://www.bilibili.com/video/BV1kCTX6uEf7/",
+    "order": 9
+  },
   "title": "未名拾音 Studio",
   "subtitle": "共同创作，让燕来有声",
   "region": "weiming-studio",
@@ -38,7 +46,7 @@
     },
     {
       "title": "2026.07.06 · 让燕来有声",
-      "body": "与《燕云十六声》合作发布《燕来有声》。让共同的声音走进更广阔的江湖，也为未名拾音留下第一段清晰的创作足迹。完整 MV 已在本馆展出。"
+      "body": "与《燕云十六声》合作发布《燕来有声》。让共同的声音走进更广阔的江湖，也为未名拾音留下第一段清晰的创作足迹。点击作品链接，在哔哩哔哩观看完整 MV。"
     },
     {
       "title": "中秋预告 · 共赴一轮明月",
@@ -51,9 +59,9 @@
   ],
   "media": [
     {
-      "kind": "video",
+      "kind": "image",
       "title": "燕来有声",
-      "src": "/assets/modules/weiming/yan-lai-you-sheng.mp4",
+      "src": "/assets/modules/weiming/yan-lai-you-sheng.webp",
       "thumbnail": "/assets/modules/weiming/yan-lai-you-sheng.webp"
     }
   ],

@@ -15,3 +15,6 @@ asset-sources/audio-wav/
 asset-sources/research/
 *.log
 /modules/weiming/assets/yan-lai-you-sheng.mp4
+playwright-report/
+test-results/
+.DS_Store

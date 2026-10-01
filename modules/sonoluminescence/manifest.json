@@ -1,6 +1,14 @@
 {
   "schemaVersion": 1,
   "id": "sonoluminescence",
+  "portfolio": {
+    "name": "Single-Bubble Sonoluminescence",
+    "category": "Research",
+    "summary": "从盐浓度与水活度，到声驱动下的气泡振荡，探索声音成为微弱光信号的过程。",
+    "technologies": ["Bubble Dynamics", "Rayleigh–Plesset", "Acoustics"],
+    "featured": true,
+    "order": 7
+  },
   "title": "Sonoluminescence",
   "subtitle": "当声音，成为一束光",
   "region": "science-valley",

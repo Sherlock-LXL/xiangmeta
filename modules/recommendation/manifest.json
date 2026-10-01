@@ -1,6 +1,14 @@
 {
   "schemaVersion": 1,
   "id": "recommendation",
+  "portfolio": {
+    "name": "Gift Chooser",
+    "category": "AI",
+    "summary": "用 NumPy 从零实现神经网络，连接礼物特征、个人偏好与推荐评分。",
+    "technologies": ["Python", "NumPy", "Neural Network"],
+    "github": "https://github.com/Sherlock-LXL/gift-chooser",
+    "order": 5
+  },
   "title": "礼物驿站",
   "subtitle": "从一个小小的选择，开始理解偏好",
   "region": "ai-mountain",

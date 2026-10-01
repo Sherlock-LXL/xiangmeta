@@ -4,6 +4,7 @@ import {groundHeight} from '../../shared/terrain-height.mjs';
 import {mountainRoutes,closestRoute,landings} from '../../shared/mountain-route.mjs';
 import {onRegionRoute} from '../../shared/region-routes.mjs';
 import {overlaps} from '../../shared/navigation.mjs';
+import {nearParkEntrance} from '../../shared/park-layout.mjs';
 import {batchStatic} from './optimizer';
 import type {Catalog} from '../core/types';
 import type {Obstacle} from './scenery';
@@ -17,7 +18,7 @@ export function gardenAccents(scene:T.Scene,catalog:Catalog,obstacles:Obstacle[]
   let seed=1271+r.id.length;const random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296),routes=mountainRoutes(r),exhibits=catalog.modules.filter(m=>m.region===r.id);let count=0;
   for(let attempt=0;attempt<500&&count<6;attempt++){
    const x=(random()*2-1)*(r.radius-3.8),z=(random()*2-1)*(r.radius-3.8),wx=x+r.position[0],wz=z+r.position[1];
-   if(Math.hypot(x,z)>r.radius-3.5||z>15&&r.terrain||exhibits.some(m=>Math.hypot(x-m.position[0],z-m.position[1])<6.1)||reserved.some(p=>Math.hypot(wx-p.x,wz-p.z)<2.3)||obstacles.some(o=>overlaps(wx,wz,o,1.1)))continue;
+   if(Math.hypot(x,z)>r.radius-3.5||nearParkEntrance(r.id,x,z,1.2)||z>15&&r.terrain||exhibits.some(m=>Math.hypot(x-m.position[0],z-m.position[1])<6.1)||reserved.some(p=>Math.hypot(wx-p.x,wz-p.z)<2.3)||obstacles.some(o=>overlaps(wx,wz,o,1.1)))continue;
    if(routes.length?routes.some(road=>closestRoute(x,z,road).distance<road.width/2+1.2)||landings(r).some(p=>Math.hypot(x-p.x,z-p.z)<p.radius+1.1):onRegionRoute(x,z,r,exhibits,1.3))continue;
    const y=groundHeight(wx,wz,catalog.regions),heights=[[.65,0],[-.65,0],[0,.65],[0,-.65]].map(([dx,dz])=>groundHeight(wx+dx,wz+dz,catalog.regions));if(Math.max(...heights,y)-Math.min(...heights,y)>.14)continue;
    const g=new T.Group();g.position.set(wx,y,wz);g.rotation.y=random()*Math.PI*2;root.add(g);

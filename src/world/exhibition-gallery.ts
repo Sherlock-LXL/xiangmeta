@@ -4,10 +4,11 @@ import type {ArtworkAction} from '../core/types';
 import {material,mesh,softBox} from './architecture';
 import {sign,type Obstacle} from './scenery';
 import {batchStatic} from './optimizer';
+import {regionTexture} from './lazy-texture';
 
 export interface GalleryPicture {title:string;src:string;width?:number;height?:number;subtitle?:string;action:ArtworkAction}
 /** An open-front arcade: artwork surrounds a clear central aisle. */
-export function exhibitionGallery(pictures:GalleryPicture[],accent:string,kind:'photography'|'albums'){
+export function exhibitionGallery(pictures:GalleryPicture[],accent:string,kind:'photography'|'albums',region:string){
   const root=new T.Group();root.name=`${kind}-arcade`;
   const stone=material('#ede4d5',.9,.02,'stone'),wood=material('#a18a78',.82,.02,'wood'),roof=material('#d6c8ba',.92,0,'stone');
   const colliders:Obstacle[]=[],artworks:NonNullable<WorldModuleScene["artworks"]>=[];
@@ -23,7 +24,14 @@ export function exhibitionGallery(pictures:GalleryPicture[],accent:string,kind:'
   box(7.9,.2,1.1,0,3.78,-6.3,roof);
   // Thin timber ribs leave daylight and the canopy visible overhead.
   for(let i=0;i<8;i++)box(7.6,.1,.1,0,3.85,3.5-i*1.4,wood);
-  const loader=new T.TextureLoader();let disposed=false;
+  // Clerestory caps, recessed skirting and warm brass trim frame the existing aisle.
+  const brass=material('#c5ab73',.35,.55,'metal');
+  for(const x of [-3.75,3.75]){
+    box(.26,.16,10.5,x,.17,-1.25,wood);
+    box(.29,.055,10.5,x,3.38,-1.25,brass);
+    for(const z of [-6.4,-3.8,-1.3,1.2,3.7])box(.42,.18,.42,x,3.48,z,stone);
+  }
+  box(7.55,.14,.25,0,.18,-6.36,wood);
   const slots=kind==='photography'?
     [...Array.from({length:4},(_,i)=>({x:-2.7+i*1.8,z:-6.32,angle:0})),...Array.from({length:5},(_,i)=>({x:-3.6,z:-5.4+i*1.85,angle:Math.PI/2})),...Array.from({length:5},(_,i)=>({x:3.6,z:-5.4+i*1.85,angle:-Math.PI/2}))]:
     [{x:-3.6,z:-1.8,angle:Math.PI/2},{x:-2.35,z:-6.32,angle:0},{x:0,z:-6.32,angle:0},{x:2.35,z:-6.32,angle:0},{x:3.6,z:-1.8,angle:-Math.PI/2}];
@@ -34,8 +42,8 @@ export function exhibitionGallery(pictures:GalleryPicture[],accent:string,kind:'
     const aspect=(p.width??1)/(p.height??1),max=kind==='albums'?1.9:1.45,w=aspect>1?max:max*aspect,h=aspect>1?max/aspect:max;
     mesh(frame,softBox(w+.22,h+.22,.09),wood);
     mesh(frame,new T.PlaneGeometry(w+.09,h+.09),material('#fffaf1'),0,0,.049);
-    const texture=loader.load(p.src,t=>{if(disposed)t.dispose();});textures.push(texture);texture.colorSpace=T.SRGBColorSpace;texture.anisotropy=4;
-    mesh(frame,new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({map:texture}),0,0,.056).castShadow=false;
+    const texture=regionTexture(p.src,region);textures.push(texture);
+    mesh(frame,new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({map:texture,toneMapped:false}),0,0,.056).castShadow=false;
     const caption=sign(frame,p.title,p.subtitle??'摄影原作',accent,Math.min(kind==='photography'?1.12:1.6,w),.20);caption.position.set(0,-h/2-.20,.025);
     frame.userData.artworkId=`work-${i}`;frame.userData.dynamic=true; // Preserve hit identity through static batching.
     const lamp=new T.MeshStandardMaterial({color:'#ffedcc',emissive:'#ffdb9d',emissiveIntensity:.2});lamp.userData.nightGlow=true;
@@ -44,5 +52,5 @@ export function exhibitionGallery(pictures:GalleryPicture[],accent:string,kind:'
   // An upholstered bench, offset from the entrance and the viewing wall.
   for(const x of [-1.1,1.1]){box(1.25,.16,.58,x,.52,-2.8,wood);box(1.15,.08,.56,x,.64,-2.8,material('#c4b5a0'));for(const side of [-.6,.6])box(.09,.44,.4,x+side,.26,-2.8,wood);colliders.push({x,z:-2.8,radius:0,halfX:.64,halfZ:.31,height:.72});}
   const release=batchStatic(root);
-  return {root,colliders,artworks,dispose(){disposed=true;release();textures.forEach(t=>t.dispose());}};
+  return {root,colliders,artworks,dispose(){release();textures.forEach(t=>t.dispose());}};
 }

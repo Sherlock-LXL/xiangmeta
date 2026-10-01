@@ -1,6 +1,15 @@
 {
   "schemaVersion": 1,
   "id": "xianglm",
+  "portfolio": {
+    "name": "XiangLM",
+    "category": "AI",
+    "summary": "从随机初始化训练的 200M 中文 Decoder-only 语言模型，完成 4B tokens 预训练与指令微调。",
+    "technologies": ["PyTorch", "Transformer", "BPE", "SFT"],
+    "github": "https://github.com/Sherlock-LXL/xianglm",
+    "featured": true,
+    "order": 1
+  },
   "title": "XiangLM Tower",
   "subtitle": "从零开始，构建语言的世界",
   "region": "ai-mountain",

@@ -16,27 +16,37 @@ export function softBox(w:number,h:number,d:number){
 const box=(g:T.Object3D,p:Palette,w:number,h:number,d:number,x=0,y=0,z=0,mat=p.main)=>mesh(g,softBox(w,h,d),mat,x,y,z);
 function ring(g:T.Object3D,r:number,y:number,mat:T.Material) {const m=mesh(g,new T.TorusGeometry(r,0.06,12,80),mat,0,y,0);m.rotation.x=Math.PI/2;return m;}
 const foliageGeometry=new T.SphereGeometry(1,24,16);
-{const p=foliageGeometry.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=1+.045*Math.sin(x*9+y*5)*Math.cos(z*8-y*3);p.setXYZ(i,x*r,y*r,z*r);}foliageGeometry.computeVertexNormals();}
+{const p=foliageGeometry.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),r=1+.065*Math.sin(x*9+y*5)*Math.cos(z*8-y*3)+.04*Math.sin(x*18-z*21);p.setXYZ(i,x*r,y*r,z*r);}foliageGeometry.computeVertexNormals();}
+// Hand-sculpted trunk: taper + two side limbs + root flare + crown stub.
 const woodGeometry=(()=>{
-  const parts:T.BufferGeometry[]=[new T.CylinderGeometry(.11,.19,1.8,12).translate(0,.9,0)];
+  const parts:T.BufferGeometry[]=[new T.CylinderGeometry(.09,.22,2.1,14).translate(0,1.05,0)];
   for(const side of [-1,1]){
-    parts.push(new T.CylinderGeometry(.045,.09,.8,10).rotateZ(-side*.6).translate(side*.2,1.55,0));
-    parts.push(new T.SphereGeometry(.2,12,8).scale(1,.45,1.3).translate(side*.12,.065,.06));
+    parts.push(new T.CylinderGeometry(.038,.08,.95,10).rotateZ(-side*.65).translate(side*.26,1.72,side*.03));
+    parts.push(new T.CylinderGeometry(.028,.055,.55,8).rotateZ(-side*.9).rotateX(side*.3).translate(side*.17,2.25,-.14));
+    parts.push(new T.SphereGeometry(.21,12,8).scale(1,.42,1.35).translate(side*.14,.058,.07));
+    parts.push(new T.SphereGeometry(.18,10,6).scale(1.1,.38,1).translate(side*.19,.05,-.14));
   }
+  parts.push(new T.CylinderGeometry(.03,.07,.42,8).translate(0,2.32,.03));
   return mergeGeometries(parts)!;
 })();
-const barkMaterial=material('#bba08a',.85,.02,'wood');
+const barkMaterial=material('#9d8468',.95,.02,'wood');
 const foliageMaterials=new Map<string,T.MeshStandardMaterial>();
 export function tree(g:T.Object3D,x:number,z:number,scale=1,color='#b0d9be') {
   mesh(g,woodGeometry,barkMaterial,x,0,z).scale.setScalar(scale);
   if(!foliageMaterials.has(color))foliageMaterials.set(color,material(color,.92,0,'foliage'));
-  const leaves=foliageMaterials.get(color)!;
-  for(const [dx,dy,dz,sx,sy,sz] of [[-.44,2.12,0,.85,.85,.8],[.43,2.25,.12,.85,.83,.8],[0,2.83,-.12,.85,.81,.8],[0,2.18,.4,.9,.85,.76]]){
-    const leaf=mesh(g,foliageGeometry,leaves,x+dx*scale,dy*scale,z+dz*scale);leaf.scale.set(sx*scale,sy*scale,sz*scale);
+  if(!foliageMaterials.has(color+'-shade'))foliageMaterials.set(color+'-shade',material(new T.Color(color).multiplyScalar(.78).getStyle(),1,0,'foliage'));
+  const leaves=foliageMaterials.get(color)!,shade=foliageMaterials.get(color+'-shade')!;
+  // Layered puff cloud: six main crowns, three deeper interior shadows for volume.
+  const bursts=[[-.5,2.0,-.08,.95,.86,.86,leaves],[.52,2.14,.12,.9,.88,.82,leaves],[-.1,2.35,.38,.92,.86,.84,leaves],[.08,2.72,-.14,.86,.78,.82,leaves],[-.42,2.52,.24,.78,.74,.8,leaves],[.46,2.46,-.24,.82,.78,.8,leaves],[0,2.1,-.04,.72,.65,.68,shade],[-.22,2.42,.08,.68,.6,.66,shade],[.26,2.3,.14,.66,.62,.64,shade]];
+  for(const [dx,dy,dz,sx,sy,sz,mat] of bursts){
+    const leaf=mesh(g,foliageGeometry,mat as T.MeshStandardMaterial,x+(dx as number)*scale,(dy as number)*scale,z+(dz as number)*scale);
+    leaf.scale.set((sx as number)*scale,(sy as number)*scale,(sz as number)*scale);
+    leaf.rotation.set((dx as number)*.3,(dz as number)*.6,(dy as number)*.1);
   }
 }
 const builders:Record<string,(g:T.Group,p:Palette)=>void>={
   tower(g,p) {
+    const bronze=material('#a99168',.38,.55,'metal'),glass=material('#527e83',.25,.3,'metal');
     box(g,p,4.65,.5,4.65,0,.31,0,p.stone);
     for(let i=0;i<7;i++){
       const w=4.6-i*0.38;box(g,p,w,0.4,w,0,0.7+i*1.35,0,p.stone);
@@ -46,10 +56,16 @@ const builders:Record<string,(g:T.Group,p:Palette)=>void>={
       for(const x of [-1,1])box(g,p,.045,.86,.055,x*(w-.8)*.28,1.38+i*1.35,(w-.6)/2+.035,p.stone);
       box(g,p,w-.4,.055,.06,0,1.03+i*1.35,w/2-.03,p.main);
       for(const x of [-1,1])box(g,p,.045,.3,.045,x*(w/2-.3),.9+i*1.35,w/2-.03,p.stone);
+      for(const side of [-1,1]){
+        box(g,p,w-.95,.65,.03,0,1.43+i*1.35,side*((w-.6)/2+.012),glass);
+        for(let n=-2;n<=2;n++)box(g,p,.035,.93,.07,n*(w-.9)/5,1.4+i*1.35,side*((w-.6)/2+.06),bronze);
+        box(g,p,.075,.1,w-.2,side*(w/2-.14),1.06+i*1.35,0,bronze);
+      }
     }
     mesh(g,new T.OctahedronGeometry(0.8),p.glow,0,11,0);ring(g,2.7,9.8,p.glow);
     for(const x of [-2.05,2.05])for(const z of [-2.05,2.05])box(g,p,.14,1.95,.14,x,1.035,z,p.stone);
     for(let n=0;n<12;n++){const a=n*Math.PI/6;mesh(g,new T.SphereGeometry(.085,8,6),p.glow,Math.cos(a)*2.7,9.8,Math.sin(a)*2.7);}
+    const crown=mesh(g,new T.TorusGeometry(.95,.025,6,64),bronze,0,11,0);crown.rotation.x=.45;
   },
   forest(g,p) {
     [[-2,-1],[2,-1],[0,-2.5]].forEach(([x,z],i)=>tree(g,x,z,1.2+i*0.15));
@@ -95,6 +111,11 @@ const builders:Record<string,(g:T.Group,p:Palette)=>void>={
     mesh(g,new T.CylinderGeometry(2.04,2.04,2.45,48),new T.MeshPhysicalMaterial({color:'#9ecedc',roughness:.23,transparent:true,opacity:.22,depthWrite:false}),0,1.94).castShadow=false;
     const bubble=mesh(g,new T.SphereGeometry(.45,24,16),new T.MeshPhysicalMaterial({color:'#c7e7f1',metalness:.1,roughness:.12,transparent:true,opacity:.48,clearcoat:1}),0,1.4);bubble.name='pulse';
     ring(g,3,0.8,p.glow);for(const x of [-3,3])box(g,p,0.3,3,0.3,x,1.5,0,p.dark);
+    for(let i=0;i<40;i++){
+      const a=i*Math.PI/20,tick=box(g,p,.025,.018,i%5===0?.28:.13,Math.sin(a)*2.83,.695,Math.cos(a)*2.83,p.dark);tick.rotation.y=a;
+    }
+    for(const y of [.76,3.46])ring(g,2.16,y,p.dark);
+    for(const x of [-3,3]){box(g,p,.44,.12,.44,x,3.02,0,p.stone);box(g,p,.06,2.4,.34,x,1.68,.03,p.glow);}
   },
   light(g,p) {
     builders.bubble(g,p);g.getObjectByName('pulse')!.scale.setScalar(0.65);g.getObjectByName('pulse')!.position.y=3.1;
@@ -132,6 +153,13 @@ const builders:Record<string,(g:T.Group,p:Palette)=>void>={
     const play=mesh(g,new T.ConeGeometry(0.7,1.1,3),p.glow,0,3,-1.5);play.name='studio-play-placeholder';play.rotation.z=-Math.PI/2;play.rotation.y=Math.PI/2;
     for(let i=0;i<7;i++)box(g,p,0.1,0.7+Math.abs(Math.sin(i))*1.5,0.1,-3+i,0.8,1.7,p.glow);
     for(const x of [-4,4])box(g,p,0.3,6,0.3,x,3,-2,p.stone);
+    const timber=material('#ac9271',.86,.02,'wood'),trim=material('#b9a67c',.4,.45,'metal');
+    box(g,p,8.35,.18,2.6,0,6,-1.05,p.stone);
+    for(let i=0;i<17;i++)box(g,p,.11,.14,2.5,-3.8+i*.475,5.78,-1.05,timber);
+    box(g,p,8.05,.06,.065,0,5.7,.22,trim);
+    for(const x of [-3.75,3.75])for(let i=0;i<8;i++)box(g,p,.12,.075,.26,x,1.3+i*.47,-1.74,timber);
+    for(let i=0;i<23;i++)box(g,p,.16,4.45,.045,-3.74+i*.34,2.75,-2.225,timber);
+    for(const y of [.55,4.98])box(g,p,7.9,.065,.07,0,y,-2.25,trim);
     for(const x of [-3.2,3.2]){box(g,p,.8,1.5,.65,x,1.1,.9,p.dark);for(const y of [.8,1.4]){const speaker=mesh(g,new T.CircleGeometry(.23,20),p.main,x,y,1.235);speaker.castShadow=false;}}
     mesh(g,new T.CylinderGeometry(.04,.06,1.6,8),p.dark,-1.5,1.1,1.3);mesh(g,new T.CapsuleGeometry(.1,.22,4,8),p.stone,-1.5,2,1.3);
     box(g,p,1.3,.12,.95,2,1.9,1.1,p.stone);box(g,p,.1,1.15,.1,2,1.28,1.1,p.dark);

@@ -1,6 +1,13 @@
 {
   "schemaVersion": 1,
   "id": "photography",
+  "portfolio": {
+    "name": "光影长廊",
+    "category": "Creative",
+    "summary": "14 幅个人摄影原作，把山川湖海、城市晨昏与旅途中看见的光留在这里。",
+    "technologies": ["Photography", "Visual Storytelling"],
+    "order": 10
+  },
   "title": "光影长廊",
   "subtitle": "把曾经看见的，留在这里",
   "region": "personal-museum",
