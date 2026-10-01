@@ -3,4 +3,5 @@ export const worldFeatures={
   responsiveSignatures:true,
   worldResonance:true,
   livingParks:true,
+  worldWhispers:true,
 } as const;

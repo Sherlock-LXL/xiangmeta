@@ -6,6 +6,7 @@ import {CoastalPark} from './coastal-park';
 import {regionLandmark} from './region-landmarks';
 import {TravelerEffects} from './traveler-effects';
 import {WorldResonance} from './world-resonance';
+import {WorldWhispers} from './world-whispers';
 import {worldFeatures} from './features';
 import {parkIslands} from '../../shared/park-layout.mjs';
 import {bridgeLightSpan} from '../../shared/bridge-joints.mjs';
@@ -60,7 +61,7 @@ export class World {
   private parameters=new Map<string,number>();private mixers:T.AnimationMixer[]=[];private projected=new T.Vector3();
   private wonders!:Discoveries;
   private park!:CoastalPark;
-  private traveler?:TravelerEffects;private resonance?:WorldResonance;
+  private traveler?:TravelerEffects;private resonance?:WorldResonance;private whispers?:WorldWhispers;
   private seasons!:Seasons;
   private memories!:Memories;private signatures!:Signatures;private photo!:PhotoCamera;private photoTime={hour:9,cycling:true};private reduced=matchMedia('(prefers-reduced-motion: reduce)');
   private extensions=new Map<string,ReturnType<typeof moduleExtensions>>();
@@ -193,6 +194,7 @@ export class World {
     const wonderEntries=discoveries(data.regions);
     if(worldFeatures.worldResonance){this.resonance=new WorldResonance(hub,data.regions,wonderEntries,bus,found);this.disposers.push(()=>this.resonance?.dispose());}
     if(worldFeatures.travelerEffects){this.traveler=new TravelerEffects(this.scene,data);this.disposers.push(()=>this.traveler?.dispose());}
+    if(worldFeatures.worldWhispers)this.whispers=new WorldWhispers(bus);
     this.wonders=new Discoveries(this.scene,wonderEntries,this.obstacles,bus,found);this.disposers.push(()=>this.wonders.dispose());
     const garden=buildGardenRoutes(this.scene,data,this.obstacles);this.disposers.push(garden.release);
     this.seasons=new Seasons(this.scene,data,this.obstacles);this.disposers.push(()=>this.seasons.dispose());
@@ -217,7 +219,7 @@ export class World {
     window.addEventListener('keyup',e=>this.keys.delete(e.code),options);window.addEventListener('blur',()=>{this.keys.clear();this.touchSide=this.touchForward=0;this.jumpRequested=false;},options);
     document.addEventListener('visibilitychange',()=>{if(document.hidden){this.keys.clear();this.touchSide=this.touchForward=0;this.jumpRequested=false;this.look.release();}},options);
     if(new URLSearchParams(location.search).has('inspect')){
-      const inspect=()=>({benches:garden.benches,walls:garden.walls,snowDrifts:this.seasons.snowDrifts,accents:accents.entries,discoveries:wonderEntries,rails:garden.rails,resonance:this.resonance?.snapshot??null,traveler:this.traveler?.snapshot??null,signatures:this.signatures?.snapshot??[],parkResponse:this.park.snapshot,harbor:{near:this.nearHarbor,...harbor},clouds:{canopyPosition:this.scene.getObjectByName('weather-cloud-canopy')?.position.toArray(),canopyOrder:this.scene.getObjectByName('weather-cloud-canopy')?.renderOrder,puffsOpaque:!((this.scene.getObjectByName('drifting-clouds') as T.Mesh).material as T.Material).transparent},nearArtwork:this.nearArtwork?.id??null,artworks:this.artworks.map(({module,...a})=>({...a,moduleId:module.id})),weather:this.environment.weatherState,snowmen:this.scene.getObjectsByProperty('name','snowman').length,player:{...this.player},camera:this.camera.position.toArray(),yaw:this.look.yaw,pitch:this.look.pitch,mode:this.mode,calls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hour:this.environment.hour,photo:this.photo.active,photoCamera:this.photo.camera.position.toArray(),gardenRoads:garden.roads,flowerCount:garden.flowerCount,flowerRoots:garden.flowerRoots,shortcuts:this.memories.shortcutPaths,obstacles:this.obstacles,memories:this.memories.entries.map(e=>({id:e.id,x:e.x,z:e.z})),trails:[...this.memories.trailPaths]});
+      const inspect=()=>({benches:garden.benches,walls:garden.walls,snowDrifts:this.seasons.snowDrifts,accents:accents.entries,discoveries:wonderEntries,rails:garden.rails,resonance:this.resonance?.snapshot??null,traveler:this.traveler?.snapshot??null,whispers:this.whispers?.snapshot??null,signatures:this.signatures?.snapshot??[],parkResponse:this.park.snapshot,harbor:{near:this.nearHarbor,...harbor},clouds:{canopyPosition:this.scene.getObjectByName('weather-cloud-canopy')?.position.toArray(),canopyOrder:this.scene.getObjectByName('weather-cloud-canopy')?.renderOrder,puffsOpaque:!((this.scene.getObjectByName('drifting-clouds') as T.Mesh).material as T.Material).transparent},nearArtwork:this.nearArtwork?.id??null,artworks:this.artworks.map(({module,...a})=>({...a,moduleId:module.id})),weather:this.environment.weatherState,snowmen:this.scene.getObjectsByProperty('name','snowman').length,player:{...this.player},camera:this.camera.position.toArray(),yaw:this.look.yaw,pitch:this.look.pitch,mode:this.mode,calls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hour:this.environment.hour,photo:this.photo.active,photoCamera:this.photo.camera.position.toArray(),gardenRoads:garden.roads,flowerCount:garden.flowerCount,flowerRoots:garden.flowerRoots,shortcuts:this.memories.shortcutPaths,obstacles:this.obstacles,memories:this.memories.entries.map(e=>({id:e.id,x:e.x,z:e.z})),trails:[...this.memories.trailPaths]});
       Object.assign(window,{__xiangmetaInspect:()=>({...inspect(),stations:this.stations.map(s=>({...s,hint:this.scene.getObjectByName(`station-${s.id}`)?.getObjectByName('solid-sign')?.userData.subtitle})),textures:textureStatus(),render:{pixelRatio:this.renderer.getPixelRatio(),shadowSize:renderSettings.shadowSize},foundations:this.scene.getObjectsByProperty('name','stratified-island').length})});this.disposers.push(()=>{delete (window as unknown as Record<string,unknown>).__xiangmetaInspect;});
     }
     this.frame=requestAnimationFrame(this.animate);
@@ -342,7 +344,9 @@ export class World {
     this.frame=requestAnimationFrame(this.animate);const dt=Math.min(this.clock.getDelta(),.1);if(document.hidden)return;const motion=this.photo.active?0:dt;this.time+=motion;
     const previousX=this.player.x,previousZ=this.player.z;
     this.mixers.forEach(m=>m.update(motion));this.photo.update(dt);if(this.mode==='first-person'){if(!this.paused)this.move(dt);this.syncCamera();}else if(!this.photo.active)this.orbit.update();
-    this.traveler?.update(motion,this.player.x,this.player.z,this.player.y,this.look.yaw,Math.hypot(this.player.x-previousX,this.player.z-previousZ)>.001,this.player.grounded,this.reduced.matches,this.region||'nexus');
+    const moving=Math.hypot(this.player.x-previousX,this.player.z-previousZ)>.001;
+    this.traveler?.update(motion,this.player.x,this.player.z,this.player.y,this.look.yaw,moving,this.player.grounded,this.reduced.matches,this.region||'nexus');
+    this.whispers?.update(motion,this.region||'nexus',moving,this.mode!=='first-person'||this.paused||!!this.near||!!this.nearArtwork||this.nearHarbor,this.environment.hour,this.resonance?.snapshot.complete);
     this.park.update(motion,this.reduced.matches,this.player.x,this.player.z,worldFeatures.livingParks);
     this.resonance?.update(motion,this.reduced.matches);
     this.guide.position.y=9.5+Math.sin(this.time*1.2)*.1;this.guide.rotation.y+=motion*.35;
