@@ -102,13 +102,15 @@ Headless Chromium 使用软件 WebGL，FPS 不代表真实设备；本轮以 cal
 
 ## H. Commits
 
+以下为报告生成前的功能与测试 commits：
+
 - `fdfa8a2` `feat: make exploration visibly resonate through the world`
 - `6308809` `feat: awaken the public islands on approach`
 - `54520b9` `feat: add quiet region whispers for moments of stillness`
 - `d354705` `polish: refine night warmth, stage response and mobile atlas`
 - `85dee7d` `test: stabilize pointer-lock UI activation`
 
-相对 checkpoint：17 个文件，327 行新增，38 行删除。
+相对 checkpoint 的功能与测试代码：17 个文件，327 行新增，38 行删除。
 
 ## I. Tests
 
