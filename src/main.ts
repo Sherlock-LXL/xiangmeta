@@ -24,6 +24,8 @@ import {harborRoutes} from '../shared/harbor.mjs';
 import {parkIslands} from '../shared/park-layout.mjs';
 import {weatherKinds,weatherNames} from '../shared/weather.mjs';
 import {artwork} from './world/artwork';
+import {resonantRegions} from '../shared/ambient-response.mjs';
+import {worldFeatures} from './world/features';
 
 const app=document.querySelector<HTMLDivElement>('#app')!;
 const touchExperience=document.documentElement.classList.contains('touch-experience');
@@ -250,10 +252,12 @@ async function boot(){
   }
   $('#world').addEventListener('world-context-lost',()=>{app.insertAdjacentHTML('beforeend',`<div class="web-loading"><h1>图形连接已中断</h1><p>重新加载世界，或继续浏览项目。</p><div class="loading-actions"><a href="${escape(location.href)}">重新进入</a><a href="${sitePath('projects/')}">View Projects →</a></div></div>`);});
   const entries=discoveries(data.regions);
+  const resonanceTotal=new Set(entries.map(entry=>entry.regionId)).size;
+  const resonanceCount=()=>resonantRegions(entries,store.discoveries).size;
   function stamps(){const count=entries.filter(d=>store.discoveries.has(d.id)).length;$('#stamp-count').textContent=`${count}/${entries.length}`;$('#journal').hidden=!entries.length;}
   $('#journal').onclick=()=>{
     const count=entries.filter(d=>store.discoveries.has(d.id)).length;
-    showPanel(panelHeader('LITTLE WONDERS','旅行印记')+`<p class="panel-description">${count===entries.length?'每一座岛，都留下了你的好奇心。':'慢一点，也许会发现展台之外的小惊喜。'}<br>已发现 ${count} / ${entries.length} · 记录保存在本机</p><div class="stamp-list">${entries.map(d=>`<article class="stamp-card ${store.discoveries.has(d.id)?'found':''}" data-stamp="${d.id}"><span class="stamp-symbol" style="--stamp:${d.color}">${store.discoveries.has(d.id)?'✧':'◇'}</span><div><small>${escape(d.regionTitle)} · ${store.discoveries.has(d.id)?'已收集':'未发现'}</small><h3>${escape(d.title)}</h3><p>${escape(d.description)}</p><button class="quiet-button" data-wonder-region="${d.regionId}">前往入口 ${diagonalArrow}</button></div></article>`).join('')}</div><p class="source-note">在区域中寻找这些小装置，靠近按 G 触发。风铃遵循右上角声音开关。</p>`);
+    showPanel(panelHeader('LITTLE WONDERS','旅行印记')+`<p class="panel-description">${count===entries.length?'每一座岛，都留下了你的好奇心。':'慢一点，也许会发现展台之外的小惊喜。'}<br>已发现 ${count} / ${entries.length} · 记录保存在本机${worldFeatures.worldResonance?`<br>四域共鸣 ${resonanceCount()} / ${resonanceTotal} · 每个核心区域发现一个装置即可点亮星塔`:''}</p><div class="stamp-list">${entries.map(d=>`<article class="stamp-card ${store.discoveries.has(d.id)?'found':''}" data-stamp="${d.id}"><span class="stamp-symbol" style="--stamp:${d.color}">${store.discoveries.has(d.id)?'✧':'◇'}</span><div><small>${escape(d.regionTitle)} · ${store.discoveries.has(d.id)?'已收集':'未发现'}</small><h3>${escape(d.title)}</h3><p>${escape(d.description)}</p><button class="quiet-button" data-wonder-region="${d.regionId}">前往入口 ${diagonalArrow}</button></div></article>`).join('')}</div><p class="source-note">在区域中寻找这些小装置，靠近按 G 触发。风铃遵循右上角声音开关。</p>`);
     dialog.querySelectorAll<HTMLButtonElement>('[data-wonder-region]').forEach(button=>button.onclick=()=>{world?.focusRegion(button.dataset.wonderRegion!);closePanel();});
   };
   $('#discovery-prompt').onclick=()=>world?.interactDiscovery();
@@ -268,7 +272,7 @@ async function boot(){
     $<HTMLInputElement>('#cycle-time').onchange=e=>world?.cycleTime((e.target as HTMLInputElement).checked);
   };
   bus.on('wonderNearby',d=>{$('#discovery-prompt').hidden=!d;$('#discovery-name').textContent=d?.title??'';$('#discovery-action').textContent=d?`${d.action} · ${store.discoveries.has(d.id)?'再次体验':'收集旅行印记'}`:'';});
-  bus.on('discover',d=>{const first=!store.discoveries.has(d.id);store.discoveries.add(d.id);store.save();stamps();$('#discovery-action').textContent=`${d.action} · 再次体验`;toast(`${first?'发现新印记':'再次体验'} · ${d.title}${d.kind==='chimes'&&store.muted?' · 右上角开启声音，可听见风铃':''}`);});
+  bus.on('discover',d=>{const first=!store.discoveries.has(d.id),before=resonanceCount();store.discoveries.add(d.id);store.save();const after=resonanceCount();stamps();$('#discovery-action').textContent=`${d.action} · 再次体验`;const resonance=worldFeatures.worldResonance&&after>before?(after===resonanceTotal?' · 四域共鸣完成，中央星塔已点亮':` · 四域共鸣 ${after}/${resonanceTotal}`):'';toast(`${first?'发现新印记':'再次体验'} · ${d.title}${resonance}${d.kind==='chimes'&&store.muted?' · 右上角开启声音，可听见风铃':''}`);});
   stamps();
   const overview=()=>{world?.overview();$('#current-region').textContent='世界总览';document.querySelectorAll('.region-nav').forEach(b=>b.classList.remove('active'));$('#overview').classList.add('active');};
   $('#overview').onclick=overview;$('#camera-reset').onclick=()=>world?.resumeWalk();$('#capture-look').onclick=()=>world?.captureMouse();$('.brand').onclick=e=>{e.preventDefault();overview();};
