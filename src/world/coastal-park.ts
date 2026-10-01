@@ -6,7 +6,9 @@ import {batchStatic} from './optimizer';
 import {sign,type Obstacle} from './scenery';
 import {palm} from './season-style';
 import {parkIslands,parkLinks} from '../../shared/park-layout.mjs';
+import {proximityEnergy} from '../../shared/ambient-response.mjs';
 import type {Region} from '../core/types';
+import type {EventBus} from '../core/events';
 
 type Point=[number,number,number];
 export type Promenade={id:string;from:number[];to:number[];width:number};
@@ -55,7 +57,9 @@ export class CoastalPark{
   private root=new T.Group();private releases:(()=>void)[]=[];private star=new T.Group();private time=0;
   private birds:T.InstancedMesh;private pose=new T.Object3D();
   private balloons:T.Group[]=[];
-  constructor(scene:T.Scene,regions:Region[],obstacles:Obstacle[]){
+  private lanterns?:T.InstancedMesh;private lanternPositions:T.Vector3[]=[];private channel?:T.MeshStandardMaterial;private starCore?:T.Mesh;
+  private gardenEnergy=0;private starEnergy=0;private insideGarden=false;private insideStar=false;
+  constructor(scene:T.Scene,regions:Region[],obstacles:Obstacle[],private bus:EventBus){
     this.root.name='coastal-park';scene.add(this.root);
     for(const link of parkLinks(regions)){
       const bridge=promenade(link,true);this.root.add(bridge);this.releases.push(batchStatic(bridge));
@@ -74,17 +78,18 @@ export class CoastalPark{
     }
     const birdGeo=new T.BufferGeometry();birdGeo.setAttribute('position',new T.Float32BufferAttribute([-.7,0,.14,-.18,.13,0,0,0,0,0,0,0,.18,.13,0,.7,0,.14],3));birdGeo.computeVertexNormals();
     this.birds=new T.InstancedMesh(birdGeo,new T.MeshBasicMaterial({color:'#f5eedc',side:T.DoubleSide}),12);this.birds.frustumCulled=false;this.birds.name='coastal-birds';this.root.add(this.birds);
-    this.update(0,false);
+    this.update(0,false,0,0,false);
   }
+  get snapshot(){return {gardenEnergy:this.gardenEnergy,starEnergy:this.starEnergy,insideGarden:this.insideGarden,insideStar:this.insideStar};}
   private garden(g:T.Group,block:(x:number,z:number,r:number,h?:number)=>void){
     const stone=material('#efe3c6',.88,.03,'stone'),warm=material('#d9b982',.85,.03,'stone'),timber=material('#9d7a4c',.86,0,'wood'),dark=material('#5f483a',.9,.02,'wood'),copper=material('#b17a4a',.4,.55,'metal'),glow=nightLight('#f7d4a0'),silk=new T.MeshStandardMaterial({color:'#fbf3dc',roughness:.88,side:T.DoubleSide});
     // Lowered granite plaza with concentric water channel.
     const plaza=mesh(g,new T.CylinderGeometry(6.8,7.1,.14,80),stone,0,-.03,0);plaza.receiveShadow=true;
-    const channelMat=material('#8fc4c0',.55,.1);channelMat.polygonOffset=true;channelMat.polygonOffsetFactor=-1;channelMat.polygonOffsetUnits=-1;
+    const channelMat=material('#8fc4c0',.55,.1);channelMat.polygonOffset=true;channelMat.polygonOffsetFactor=-1;channelMat.polygonOffsetUnits=-1;this.channel=channelMat;
     const channel=mesh(g,new T.RingGeometry(6.2,6.5,80),channelMat,0,.05,0);channel.rotation.x=-Math.PI/2;channel.castShadow=false;
     // Octagonal timber pavilion over the center.
     const pavilion=new T.Group();g.add(pavilion);
-    for(let i=0;i<8;i++){const a=i/8*Math.PI*2;const col=mesh(pavilion,new T.CylinderGeometry(.11,.14,3.4,14),timber,Math.sin(a)*2.6,1.7,Math.cos(a)*2.6);col.castShadow=true;block(Math.sin(a)*2.6,Math.cos(a)*2.6,.18,3.5);
+    for(let i=0;i<8;i++){const a=i/8*Math.PI*2+Math.PI/8;const col=mesh(pavilion,new T.CylinderGeometry(.11,.14,3.4,14),timber,Math.sin(a)*2.6,1.7,Math.cos(a)*2.6);col.castShadow=true;block(Math.sin(a)*2.6,Math.cos(a)*2.6,.18,3.5);
       // Decorative capital.
       mesh(pavilion,new T.BoxGeometry(.36,.1,.36),dark,Math.sin(a)*2.6,3.42,Math.cos(a)*2.6).rotation.y=a;
     }
@@ -109,8 +114,10 @@ export class CoastalPark{
       const body=mesh(pavilion,new T.CylinderGeometry(.14,.14,.3,10),silk,x,2.4,z);body.castShadow=false;
       mesh(pavilion,new T.CylinderGeometry(.16,.11,.09,10),copper,x,2.6,z).castShadow=false;
       mesh(pavilion,new T.CylinderGeometry(.11,.16,.09,10),copper,x,2.22,z).castShadow=false;
-      const flame=mesh(pavilion,new T.SphereGeometry(.09,10,8),glow,x,2.4,z);flame.castShadow=false;flame.name='lantern-flame';
+      this.lanternPositions.push(new T.Vector3(x,2.4,z));
     }
+    this.lanterns=new T.InstancedMesh(new T.SphereGeometry(.09,10,8),glow,this.lanternPositions.length);this.lanterns.name='garden-lantern-flames';this.lanterns.userData.dynamic=true;this.lanterns.frustumCulled=false;pavilion.add(this.lanterns);
+    this.lanternPositions.forEach((position,i)=>{this.pose.position.copy(position);this.pose.scale.setScalar(1);this.pose.updateMatrix();this.lanterns!.setMatrixAt(i,this.pose.matrix);});
     // Marble bench ring under the roof.
     for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4,bx=Math.sin(a)*1.9,bz=Math.cos(a)*1.9;
       const seat=mesh(pavilion,new T.BoxGeometry(1.8,.14,.42),stone,bx,.46,bz);seat.rotation.y=a;
@@ -127,15 +134,16 @@ export class CoastalPark{
       }
       block(px,pz,1.1,.75);
     }
-    // Palms at the four corners outside the garden ring.
-    for(let i=0;i<4;i++){const a=i/4*Math.PI*2,px=Math.sin(a)*6.0,pz=Math.cos(a)*6.0;palm(g,px,pz,.95);block(px,pz,.32);}
+    // Keep the south arrival axis open; the east tide pool replaces that palm.
+    for(const i of [0,3]){const a=i/4*Math.PI*2,px=Math.sin(a)*6.0,pz=Math.cos(a)*6.0;palm(g,px,pz,.95);block(px,pz,.32);}
     // Secondary border trees between them.
     for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4,px=Math.sin(a)*6.2,pz=Math.cos(a)*6.2;tree(g,px,pz,.85,'#86a390');block(px,pz,.32);}
-    // Little tide pool stepping down to the sea at the south edge.
-    mesh(g,new T.CylinderGeometry(1.4,1.6,.18,32),stone,0,0,-7.6);
-    mesh(g,new T.CylinderGeometry(1.3,1.3,.04,32),material('#7ab3b2',.4,.3),0,.11,-7.6).castShadow=false;
-    for(let i=0;i<10;i++){const a=i/10*Math.PI*2;mesh(g,new T.SphereGeometry(.1,8,6),material('#a0b8a4',1,0,'stone'),Math.sin(a)*1.42,.15,-7.6+Math.cos(a)*1.42);}
-    block(0,-7.6,1.5,.18);
+    // Little tide pool at the east overlook, away from both arrival paths.
+    const poolX=7.5,poolZ=0;
+    mesh(g,new T.CylinderGeometry(1.4,1.6,.18,32),stone,poolX,0,poolZ);
+    mesh(g,new T.CylinderGeometry(1.3,1.3,.04,32),material('#7ab3b2',.4,.3),poolX,.11,poolZ).castShadow=false;
+    for(let i=0;i<10;i++){const a=i/10*Math.PI*2;mesh(g,new T.SphereGeometry(.1,8,6),material('#a0b8a4',1,0,'stone'),poolX+Math.sin(a)*1.42,.15,poolZ+Math.cos(a)*1.42);}
+    block(poolX,poolZ,1.5,.18);
     // Boundary rail lights along the arrival shore.
     for(let i=0;i<10;i++){const a=-Math.PI+i/9*Math.PI,x=Math.sin(a)*9.2,z=Math.cos(a)*9.2;
       mesh(g,new T.CylinderGeometry(.045,.06,.9,8),dark,x,.45,z);
@@ -171,7 +179,7 @@ export class CoastalPark{
     mesh(g,new T.CylinderGeometry(1.25,1.6,.24,48),stone,2,.12,0);
     mesh(g,new T.CylinderGeometry(.43,.75,1.1,32),teal,2,.69,0);block(2,0,1.6,1.95);
     this.star.userData.dynamic=true;this.star.position.set(2,2.6,0);g.add(this.star);
-    const planet=mesh(this.star,new T.IcosahedronGeometry(.95,3),material('#8ebdb5',.22,.35));planet.name='observatory-planet';
+    const planet=mesh(this.star,new T.IcosahedronGeometry(.95,3),material('#8ebdb5',.22,.35));planet.name='observatory-planet';this.starCore=planet;
     for(let i=0;i<3;i++){const ring=mesh(this.star,new T.TorusGeometry(1.55+i*.22,.032,8,72),i===1?glow:bronze);ring.rotation.set(.6+i*.65,.3+i*.8,0);}
     for(let i=0;i<7;i++){const a=i/7*Math.PI*2;mesh(this.star,new T.SphereGeometry(.075,10,8),glow,Math.cos(a)*2,Math.sin(a)*1.2,Math.sin(a)*1.5);}
     const disc=mesh(g,new T.RingGeometry(2.8,3,64),bronze,2,.065);disc.rotation.x=-Math.PI/2;
@@ -181,13 +189,22 @@ export class CoastalPark{
     for(let i=0;i<3;i++){const a=i/3*Math.PI*2;beam(telescope,[Math.sin(a)*.65,0,Math.cos(a)*.65],[0,1.5,0],.035,bronze);}
     const tube=mesh(telescope,new T.CylinderGeometry(.22,.28,1.75,24),teal,0,1.95,0);tube.rotation.z=-.7;block(6,7,.75,2.7);
   }
-  update(dt:number,reduced:boolean){
+  update(dt:number,reduced:boolean,x:number,z:number,enabled=true){
     if(!reduced)this.time+=dt;
-    this.star.rotation.y=this.time*.16;
+    const tide=parkIslands.find(place=>place.id==='tide-garden')!,stars=parkIslands.find(place=>place.id==='star-deck')!;
+    const gardenTarget=enabled?proximityEnergy(Math.hypot(x-tide.position[0],z-tide.position[1]),2.5,12):0,starTarget=enabled?proximityEnergy(Math.hypot(x-stars.position[0]-2,z-stars.position[1]),2.5,12):0;
+    const blend=reduced?1:1-Math.exp(-dt*3);this.gardenEnergy+=(gardenTarget-this.gardenEnergy)*blend;this.starEnergy+=(starTarget-this.starEnergy)*blend;
+    if(this.gardenEnergy>.72&&!this.insideGarden){this.insideGarden=true;this.bus.emit('melody',[392,523.25,659.25]);}else if(this.gardenEnergy<.2)this.insideGarden=false;
+    if(this.starEnergy>.72&&!this.insideStar){this.insideStar=true;this.bus.emit('melody',[440,554.37,659.25,880]);}else if(this.starEnergy<.2)this.insideStar=false;
+    this.star.rotation.y+=reduced?0:dt*(.16+this.starEnergy*.48);
+    const coreScale=1+this.starEnergy*.1+(reduced?0:Math.sin(this.time*1.8)*.018*this.starEnergy);this.starCore?.scale.setScalar(coreScale);
+    if(this.channel){this.channel.emissive.set('#68b5ae');this.channel.emissiveIntensity=.03+this.gardenEnergy*.34;}
+    if(this.lanterns)this.lanternPositions.forEach((position,i)=>{this.pose.position.copy(position);const flicker=reduced?0:Math.sin(this.time*3.2+i*1.7)*.04;this.pose.scale.setScalar(1+this.gardenEnergy*.5+flicker);this.pose.updateMatrix();this.lanterns!.setMatrixAt(i,this.pose.matrix);});
+    if(this.lanterns)this.lanterns.instanceMatrix.needsUpdate=true;
     for(const [i,balloon] of this.balloons.entries()){
       const base=balloon.userData.baseY as number;
-      balloon.position.y=base+Math.sin(this.time*.4+i*1.3)*.4;
-      balloon.rotation.y=Math.sin(this.time*.18+i*2)*.1;
+      balloon.position.y=base+Math.sin(this.time*(.4+this.gardenEnergy*.08)+i*1.3)*(.4+this.gardenEnergy*.12);
+      balloon.rotation.y=Math.sin(this.time*.18+i*2)*(.1+this.gardenEnergy*.04);
     }
     for(let i=0;i<12;i++){
       const a=this.time*(.023+i%3*.005)+i*2.39996,r=42+i%4*8;

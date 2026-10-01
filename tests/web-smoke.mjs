@@ -60,6 +60,14 @@ try{
   await page.locator('#interaction-prompt a[href="https://github.com/Sherlock-LXL/xianglm"]').waitFor({timeout:30000});
   assert.equal(await page.evaluate(()=>window.__xiangmetaInspect().resonance.total),4);
   await page.waitForFunction(()=>window.__xiangmetaInspect().signatures.some(effect=>effect.kind==='tokens'&&effect.activity>.4));
+  await page.locator('[data-park="tide-garden"]').click({noWaitAfter:true});
+  await page.locator('#world canvas').focus();
+  await page.keyboard.down('Shift');
+  await page.keyboard.down('w');
+  await page.waitForFunction(()=>window.__xiangmetaInspect().parkResponse.gardenEnergy>.7);
+  await page.keyboard.up('w');
+  await page.keyboard.up('Shift');
+  assert.equal(await page.evaluate(()=>window.__xiangmetaInspect().parkResponse.insideGarden),true);
   await context.close();
 
   const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
