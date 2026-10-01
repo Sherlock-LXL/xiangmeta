@@ -100,6 +100,7 @@ try{
   await joystick.dispatchEvent('pointerup',{pointerId:40,pointerType:'touch',button:0,clientX:joystickCenter.x+20,clientY:joystickCenter.y-32});
   await mobilePage.evaluate(()=>window.dispatchEvent(new PointerEvent('pointerup',{pointerId:41,pointerType:'touch',clientX:230,clientY:350})));
   assert.ok(await mobilePage.evaluate(()=>window.__xiangmetaInspect().traveler.activeMarks>0));
+  assert.equal(await mobilePage.locator('.mini-atlas text').first().evaluate(element=>getComputedStyle(element).display),'none');
   assert.equal(await mobilePage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await mobile.close();
 

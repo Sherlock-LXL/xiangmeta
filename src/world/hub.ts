@@ -27,6 +27,9 @@ export function buildHub(){
   for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4;
     const archPoints=Array.from({length:17},(_,j)=>{const t=j/16;const r=1.78;return new T.Vector3(Math.sin(a-.7+t*1.4)*r,1.78+Math.sin(t*Math.PI)*.72,Math.cos(a-.7+t*1.4)*r);});
     mesh(drum,new T.TubeGeometry(new T.CatmullRomCurve3(archPoints),20,.09,8,false),travertine);
+    mesh(drum,new T.CylinderGeometry(.018,.018,.52,6),copper,Math.sin(a)*1.08,2.25,Math.cos(a)*1.08).castShadow=false;
+    mesh(drum,new T.ConeGeometry(.19,.16,12),copper,Math.sin(a)*1.08,1.98,Math.cos(a)*1.08).rotation.x=Math.PI;
+    mesh(drum,new T.SphereGeometry(.105,12,8),emberGlow,Math.sin(a)*1.08,1.91,Math.cos(a)*1.08).castShadow=false;
   }
   // Entablature: thick stone cornice above the arcade.
   mesh(drum,new T.CylinderGeometry(2.08,2.08,.24,64),limestone,0,2.95);

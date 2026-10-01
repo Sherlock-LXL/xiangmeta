@@ -20,7 +20,7 @@ export class Signatures {
         points.material.onBeforeCompile=shader=>{shader.vertexShader='attribute float life;varying float lifeFade;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('gl_PointSize = size;','lifeFade=smoothstep(0.0,0.12,life)*(1.0-smoothstep(0.9,1.0,life)); gl_PointSize = size*sqrt(lifeFade);');shader.fragmentShader='varying float lifeFade;\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('vec4( diffuse, opacity )','vec4( diffuse, opacity * lifeFade )');};
         points.material.customProgramCacheKey=()=> 'xiangmeta-bubble-life-v1';
       }
-      points.position.set(region.position[0]+module.position[0],0,region.position[1]+module.position[1]);points.position.y=groundHeight(points.position.x,points.position.z,catalog.regions);points.frustumCulled=false;points.name=`signature-${module.id}`;scene.add(points);this.effects.push({kind,points,positions,count,activity:0,baseSize});
+      points.position.set(region.position[0]+module.position[0],0,region.position[1]+module.position[1]);points.position.y=groundHeight(points.position.x,points.position.z,catalog.regions);points.rotation.y=(module.rotation??0)*Math.PI/180;points.frustumCulled=false;points.name=`signature-${module.id}`;scene.add(points);this.effects.push({kind,points,positions,count,activity:0,baseSize});
     }
   }
   get snapshot(){return this.effects.map(effect=>({kind:effect.kind,activity:effect.activity,opacity:(effect.points.material as T.PointsMaterial).opacity}));}
