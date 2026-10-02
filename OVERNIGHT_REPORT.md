@@ -53,10 +53,12 @@ Checkpoint：`a0ff2a4`
 ## C. 世界 Polish
 
 - 清理潮汐花园传送点到凉亭的真实通路。
+- 将公共桥可见桥面与板缝压到行走平面下方，并加入深度偏移，消除桥面与岛面交界处的轻微闪动。
 - 潮池移到东侧，移除主轴上的棕榈，旋转柱列形成明确入口。
 - 灯笼火焰改为实例化，降低 draw calls。
 - 修正未名拾音舞台粒子方向，使其朝向观众侧。
 - 中央星塔增加四盏克制的暖色建筑灯，改善夜景冷硬感。
+- 删除潮汐花园和观星台独有的英文浮空界面标签，保留侧栏导航与岛上实体导视牌。
 - 移动端迷你地图隐藏不可读的小字，保留岛屿和点击传送。
 - 最终截图复核未发现新增悬浮、穿模、Z-fighting、桥口阻挡或 UI 重叠。
 
@@ -87,6 +89,8 @@ Headless Chromium 使用软件 WebGL，FPS 不代表真实设备；本轮以 cal
 - 凉亭柱列缺少清晰入口。
 - 音乐舞台粒子未继承模块旋转，出现在舞台背面。
 - 移动端迷你地图文字重叠且无法阅读。
+- 公共桥面和岛面共面导致桥口移动时轻微闪动。
+- 两个公共岛出现了其他岛屿没有的英文浮空标签。
 - 长 E2E 中 pointer lock 会异步夺回焦点，导致 Enter 偶发漏触发。
 
 ## G. 尝试后删除或回滚的想法
@@ -109,6 +113,7 @@ Headless Chromium 使用软件 WebGL，FPS 不代表真实设备；本轮以 cal
 - `54520b9` `feat: add quiet region whispers for moments of stillness`
 - `d354705` `polish: refine night warmth, stage response and mobile atlas`
 - `85dee7d` `test: stabilize pointer-lock UI activation`
+- `44dff05` `fix: stabilize public bridge joints and remove park tags`
 
 相对 checkpoint 的功能与测试代码：17 个文件，327 行新增，38 行删除。
 
@@ -116,7 +121,7 @@ Headless Chromium 使用软件 WebGL，FPS 不代表真实设备；本轮以 cal
 
 - Production build：通过。
 - TypeScript：通过。
-- Unit：`25/25` 通过。
+- Unit：`26/26` 通过。
 - Smoke：通过，覆盖 landing、项目链接、响应式环境、共鸣、公共岛和移动控制。
 - Full Chromium E2E：通过。
 - E2E 覆盖：WASD、跳跃、Pointer Lock、F/E/R、项目链接、地图、摄影、记忆、音乐、科研 Worker、10 个展品、港口、移动双指操作、WebGL 降级。
