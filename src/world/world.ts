@@ -181,7 +181,6 @@ export class World {
     this.park=new CoastalPark(this.scene,data.regions,this.obstacles,bus);this.disposers.push(()=>this.park.dispose());
     for(const place of parkIslands){
       this.label(`◉ ${place.title}`,new T.Vector3(place.position[0],2.4,place.position[1]-place.radius+1.5),()=>this.focusPark(place.id),'region-label',place.id);
-      this.label(place.english,new T.Vector3(place.position[0],1.1,place.position[1]+place.radius-2.2),()=>this.focusPark(place.id),'future-label',`${place.id}-tag`);
     }
     const hub=buildHub();this.scene.add(hub);this.disposers.push(batchStatic(hub));
     this.obstacles.push({x:0,z:0,radius:2.6,height:3.1});

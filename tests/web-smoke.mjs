@@ -58,6 +58,7 @@ try{
   await page.locator('#world canvas').waitFor({state:'visible',timeout:15000});
   await page.waitForFunction(()=>Number(document.querySelector('#world')?.dataset.previewReady)>0,null,{timeout:30000});
   await page.locator('#interaction-prompt a[href="https://github.com/Sherlock-LXL/xianglm"]').waitFor({timeout:30000});
+  assert.equal(await page.locator('.future-label').filter({hasText:/TIDAL GARDEN|STAR OBSERVATORY/}).count(),0);
   assert.equal(await page.evaluate(()=>window.__xiangmetaInspect().resonance.total),4);
   await page.waitForFunction(()=>window.__xiangmetaInspect().signatures.some(effect=>effect.kind==='tokens'&&effect.activity>.4));
   await page.locator('[data-park="tide-garden"]').click({noWaitAfter:true});

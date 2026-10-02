@@ -5,7 +5,7 @@ import {islandFoundation} from './island-foundation';
 import {batchStatic} from './optimizer';
 import {sign,type Obstacle} from './scenery';
 import {palm} from './season-style';
-import {parkIslands,parkLinks} from '../../shared/park-layout.mjs';
+import {parkDeckVisualOffset,parkIslands,parkLinks} from '../../shared/park-layout.mjs';
 import {proximityEnergy} from '../../shared/ambient-response.mjs';
 import type {Region} from '../core/types';
 import type {EventBus} from '../core/events';
@@ -18,14 +18,15 @@ function beam(root:T.Object3D,a:Point,b:Point,r:number,mat:T.Material){
   const bar=mesh(root,new T.CylinderGeometry(r,r,delta.length(),8),mat);
   bar.position.copy(start.add(end).multiplyScalar(.5));bar.quaternion.setFromUnitVectors(up,delta.normalize());return bar;
 }
-/** The deck's top uses exactly the same linearly interpolated plane as walking. */
+/** Keep the visible deck just below the walking plane so island overlaps cannot z-fight. */
 export function promenade(link:Promenade,arches=false){
   const g=new T.Group();g.name=`promenade-${link.id}`;
   const [ax,ay,az]=link.from,[bx,by,bz]=link.to,dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz),nx=-dz/length,nz=dx/length,w=link.width/2;
   const stone=material('#e8dec9',.87,0,'paving'),timber=material('#a78c65',.83,0,'wood'),bronze=material('#506f70',.48,.4,'metal'),glow=nightLight('#f9dca2');
+  stone.polygonOffset=true;stone.polygonOffsetFactor=1;stone.polygonOffsetUnits=1;
   const point=(t:number,side:number,y=0):Point=>[ax+dx*t+nx*side,ay+(by-ay)*t+y,az+dz*t+nz*side];
   const endGap=Math.min(3.2,length*.18),t0=endGap/length,t1=1-t0;
-  const geo=new T.BufferGeometry(),vertices=[...point(0,-w),...point(1,-w),...point(1,w),...point(0,w)];
+  const geo=new T.BufferGeometry(),vertices=[...point(0,-w,parkDeckVisualOffset),...point(1,-w,parkDeckVisualOffset),...point(1,w,parkDeckVisualOffset),...point(0,w,parkDeckVisualOffset)];
   geo.setAttribute('position',new T.Float32BufferAttribute(vertices,3));geo.setAttribute('uv',new T.Float32BufferAttribute([0,0,0,length/3,link.width/3,length/3,link.width/3,0],2));geo.setIndex([0,2,1,0,3,2]);geo.computeVertexNormals();
   mesh(g,geo,stone).castShadow=false;
   for(const side of [-1,1]){
@@ -40,7 +41,7 @@ export function promenade(link:Promenade,arches=false){
       if(i>0&&i<posts&&i%2===0)beam(g,point(t,side*(w-.35),-.1),[point(t,side*(w-.35))[0],-6,point(t,side*(w-.35))[2]],.15,timber);
     }
   }
-  for(let p=.6;p<length;p+=1.2)beam(g,point(p/length,-w+.3,.008),point(p/length,w-.3,.008),.009,timber).castShadow=false;
+  for(let p=.6;p<length;p+=1.2)beam(g,point(p/length,-w+.3,parkDeckVisualOffset+.008),point(p/length,w-.3,parkDeckVisualOffset+.008),.009,timber).castShadow=false;
   if(arches&&length>8)for(const side of [-1,1]){
     const pts=Array.from({length:25},(_,i)=>{const t=t0+(t1-t0)*i/24;return new T.Vector3(...point(t,side*(w+.1),Math.sin(i/24*Math.PI)*3.5-.32));});
     mesh(g,new T.TubeGeometry(new T.CatmullRomCurve3(pts),40,.105,8,false),stone);

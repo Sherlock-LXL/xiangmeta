@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {loadCatalog} from '../backend/catalog.mjs';
 import {groundHeight,regionHeight} from '../shared/terrain-height.mjs';
 import {bridgeLightSpan} from '../shared/bridge-joints.mjs';
-import {nearParkEntrance,parkConnections} from '../shared/park-layout.mjs';
+import {nearParkEntrance,parkConnections,parkDeckVisualOffset,parkHeight,parkLinks} from '../shared/park-layout.mjs';
 import {shoreLayout} from '../shared/shore-layout.mjs';
 import {createWalker,advanceWalker} from '../shared/locomotion.mjs';
 test('mountain projects occupy ascending terraces and the arrival meets the sea-level bridge',async()=>{
@@ -48,6 +48,18 @@ test('public bridge entrances stay clear of shoreline plants and fences',async()
    if(!nearParkEntrance(region.id,entry.fence.x,entry.fence.z,1))continue;
    assert.equal(entry.fenceClear,false,`${link.id} fence must be removed`);
    assert.equal(entry.plant,null,`${link.id} planting must be removed`);
+  }
+ }
+});
+
+test('public bridge decks render below their shared walking plane at both island joints',async()=>{
+ const {public:c}=await loadCatalog(process.cwd());
+ assert.ok(parkDeckVisualOffset<=-.02);
+ for(const link of parkLinks(c.regions)){
+  for(const [x,y,z] of [link.from,link.to]){
+   const walking=parkHeight(x,z,c.regions);
+   assert.notEqual(walking,null);
+   assert.ok(y+parkDeckVisualOffset<=walking-.02,`${link.id} deck must not be coplanar with its island`);
   }
  }
 });

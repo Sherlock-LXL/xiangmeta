@@ -3,6 +3,7 @@ export const parkIslands=[
   {id:'tide-garden',title:'潮汐花园',english:'TIDAL GARDEN',description:'走过海面，在风帆下休息，听海风经过。',position:[0,66],radius:12,color:'#b5d4bf',spawn:[0,-8],look:[0,2]},
   {id:'star-deck',title:'观星台',english:'STAR OBSERVATORY',description:'一座面向海天的开放天文台，转动星环，把世界留在喜欢的时刻。',position:[62,2],radius:12,color:'#bccfdb',spawn:[-7,0],look:[2,0]}
 ];
+export const parkDeckVisualOffset=-.028;
 export const parkConnections=[
   {id:'autumn-walk',regionId:'personal-museum',offset:[8,13],destination:'tide-garden',arrival:[-6,-9],width:3.4},
   {id:'summer-walk',regionId:'weiming-studio',offset:[-8,13],destination:'tide-garden',arrival:[6,-9],width:3.4},
