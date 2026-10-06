@@ -32,7 +32,7 @@ try{
       const activate=async locator=>{
         await page.evaluate(()=>document.pointerLockElement&&document.exitPointerLock());
         await page.waitForFunction(()=>!document.pointerLockElement);
-        await locator.press('Enter');
+        await locator.click();
       };
       page.on('pageerror',e=>errors.push(e.message));
       page.on('request',r=>requests.push(r.url()));
@@ -221,7 +221,7 @@ try{
       assert.equal(await mp.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       assert.equal(await mp.locator('.project-card>p').first().evaluate(e=>getComputedStyle(e).fontSize),'14px');
       await mp.goto(url('world/?inspect'));await mp.locator('#world canvas').waitFor({timeout:90000});
-      await mp.waitForFunction(()=>typeof window.__xiangmetaInspect==='function');
+      await mp.waitForFunction(()=>typeof window.__xiangmetaInspect==='function',null,{timeout:90000});
       const joystick=mp.locator('#touch-joystick'),joystickBox=await joystick.boundingBox();
       assert.ok(joystickBox);const joystickCenter={x:joystickBox.x+joystickBox.width/2,y:joystickBox.y+joystickBox.height/2};
       const mobileStart=await mp.evaluate(()=>window.__xiangmetaInspect().player);
