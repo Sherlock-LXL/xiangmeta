@@ -20,14 +20,6 @@ const lines={
     day:'旋律常常先出现在海风里，后来才被写进作品。',
     night:'舞台没有熄灭，它只是在等下一次有人靠近。',
   },
-  'tide-garden':{
-    day:'走慢一点，风经过灯笼和水道时，会留下不同的节奏。',
-    night:'潮汐花园的灯，会为愿意停下来的人亮得更久一点。',
-  },
-  'star-deck':{
-    day:'星图不只指向远方，也记录你刚刚从哪座岛走来。',
-    night:'现在抬头正合适。观星台会把靠近的人写进自己的轨道。',
-  },
 };
 
 export function worldWhisper(region,hour,resonanceComplete=false){

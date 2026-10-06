@@ -9,8 +9,6 @@ const colors:Record<string,string>={
   'science-valley':'#72aebe',
   'personal-museum':'#b88435',
   'weiming-studio':'#54a788',
-  'tide-garden':'#5a9f82',
-  'star-deck':'#7baabd',
 };
 
 /** A one-draw-call trail plus two pooled arrival rings. */

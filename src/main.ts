@@ -21,7 +21,6 @@ import {memoryEntries,growthEntries,starPosition} from '../shared/memories.mjs';
 import type {MemoryFragment,ArtworkInteraction} from './core/types';
 import {horizons} from './world/horizons';
 import {harborRoutes} from '../shared/harbor.mjs';
-import {parkIslands} from '../shared/park-layout.mjs';
 import {weatherKinds,weatherNames} from '../shared/weather.mjs';
 import {artwork} from './world/artwork';
 import {resonantRegions} from '../shared/ambient-response.mjs';
@@ -44,8 +43,6 @@ async function boot(){
       <button class="nav-overview active" id="overview" aria-label="世界总览" title="世界总览">${navIcon('world')} <span>世界总览</span><span class="nav-end">⌘</span></button>
       <div class="nav-section-label">探索大陆</div>
       <nav id="regions">${data.regions.map((r,i)=>`<button class="region-nav" data-region="${r.id}" aria-label="${escape(r.title)}" title="${escape(r.title)}" style="--accent:${r.color}">${navIcon(['mountain','science','museum','studio'][i])}<span>${escape(r.title)}<small>${escape(r.english)}</small></span><span class="nav-end">${diagonalArrow}</span></button>`).join('')}</nav>
-      <div class="nav-section-label">海上公共空间</div>
-      <nav id="parks">${parkIslands.map(place=>`<button class="region-nav park-nav" data-park="${place.id}" aria-label="${escape(place.title)}" title="${escape(place.title)}" style="--accent:${place.color}"><span class="region-icon" aria-hidden="true">◉</span><span>${escape(place.title)}<small>${escape(place.english)}</small></span><span class="nav-end">${diagonalArrow}</span></button>`).join('')}</nav>
       <div class="side-divider"></div>
       <button class="secondary-nav" id="collections" aria-label="展品索引" title="展品索引">${navIcon('collections')} <span>展品索引</span><b>${String(data.modules.length).padStart(2,'0')}</b></button>
       <button class="secondary-nav" id="favorites" aria-label="我的收藏" title="我的收藏">${navIcon('favorites')} <span>我的收藏</span><b id="favorite-count">${store.favorites.size}</b></button>
@@ -56,7 +53,7 @@ async function boot(){
       <header class="topbar"><div class="topbar-location">${touchExperience?'<button class="icon-button mobile-menu-button" id="mobile-menu" aria-label="打开探索菜单" aria-expanded="false">☰</button>':''}<span class="breadcrumb">我的数字宇宙</span><span class="slash">/</span><span id="current-region">世界总览</span></div><div class="top-actions"><span class="local-badge"><span class="status-dot"></span> 本地世界</span><button class="icon-button" id="sound" aria-label="开启声音" title="开启声音"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l11-3v13M9 9l11-3"/><ellipse cx="6" cy="18" rx="3" ry="2.5"/><ellipse cx="17" cy="16" rx="3" ry="2.5"/></svg><span class="muted-slash" aria-hidden="true"></span></button><button class="journal-button" id="journal" aria-label="旅行印记" title="旅行印记">✧ <span id="stamp-count"></span></button><button class="icon-button" id="help" aria-label="操作指南">?</button></div></header>
       <section id="world" aria-label="可探索的 3D 世界"></section>
       <div class="world-heading"><div class="eyebrow"><span class="line"></span> THE LIVING ATLAS</div><h1>一个世界，无限可能<span>。</span></h1><p>让好奇心带路，让每一次创造成为新的大陆。</p></div>
-      <div class="world-meta"><span class="status-dot"></span> ${data.regions.length} REGIONS <span class="meta-divider">/</span> ${parkIslands.length} PUBLIC <span class="meta-divider">/</span> ${String(data.modules.length).padStart(2,'0')} EXHIBITS <span class="meta-divider">/</span> ALWAYS GROWING</div>
+      <div class="world-meta"><span class="status-dot"></span> ${data.regions.length} REGIONS <span class="meta-divider">/</span> ${String(data.modules.length).padStart(2,'0')} EXHIBITS <span class="meta-divider">/</span> ALWAYS GROWING</div>
       <div class="crosshair" aria-hidden="true"></div>
       <div class="interaction-prompt" id="interaction-prompt" hidden></div>
       <button class="interaction-prompt discovery-prompt" id="discovery-prompt" hidden><span class="interaction-key">G</span><span><b id="discovery-name"></b><small id="discovery-action"></small></span><span class="prompt-art">${actionIcon('sparkle')}</span></button>
@@ -65,7 +62,7 @@ async function boot(){
       <button class="guide-card" id="guide"><span class="guide-orb">✦</span><span><b>世界向导</b><small>下一站，想去哪里？</small></span><span>${diagonalArrow}</span></button>
       ${touchExperience?'<div class="touch-controls" id="touch-controls" aria-label="触控探索"><div class="touch-joystick" id="touch-joystick" aria-label="拖动摇杆移动"><div class="touch-joystick-knob"></div><small>移动</small></div><div class="touch-look-hint">拖动画面环顾</div><button class="touch-jump" id="touch-jump" aria-label="跳跃"><span>↑</span><small>跳跃</small></button></div>':''}
       <div class="compass" aria-hidden="true">N<br><span>✧</span></div>
-      <aside class="mini-atlas" id="mini-atlas" aria-label="世界迷你地图"><svg viewBox="-100 -100 200 200" role="img" aria-label="迷你地图"><circle class="atlas-sea" cx="0" cy="0" r="99"/>${data.regions.map(r=>`<g class="atlas-region" data-mini-region="${r.id}" style="--accent:${r.color}" tabindex="0" role="button" aria-label="${escape(r.title)}"><circle cx="${r.position[0]}" cy="${r.position[1]}" r="${r.radius}"/><text x="${r.position[0]}" y="${r.position[1]+r.radius+6}">${escape(r.english)}</text></g>`).join('')}${parkIslands.map(p=>`<g class="atlas-park" data-mini-park="${p.id}" tabindex="0" role="button" aria-label="${escape(p.title)}"><circle cx="${p.position[0]}" cy="${p.position[1]}" r="${p.radius}"/><text x="${p.position[0]}" y="${p.position[1]-p.radius-4}">${escape(p.english)}</text></g>`).join('')}<circle class="atlas-hub" cx="0" cy="0" r="2.4"/><g id="atlas-player" transform="translate(0,0)"><circle r="2.8"/><circle class="atlas-pulse" r="4.4"/></g></svg></aside>
+      <aside class="mini-atlas" id="mini-atlas" aria-label="世界迷你地图"><svg viewBox="-100 -100 200 200" role="img" aria-label="迷你地图"><circle class="atlas-sea" cx="0" cy="0" r="99"/>${data.regions.map(r=>`<g class="atlas-region" data-mini-region="${r.id}" style="--accent:${r.color}" tabindex="0" role="button" aria-label="${escape(r.title)}"><circle cx="${r.position[0]}" cy="${r.position[1]}" r="${r.radius}"/><text x="${r.position[0]}" y="${r.position[1]+r.radius+6}">${escape(r.english)}</text></g>`).join('')}<circle class="atlas-hub" cx="0" cy="0" r="2.4"/><g id="atlas-player" transform="translate(0,0)"><circle r="2.8"/><circle class="atlas-pulse" r="4.4"/></g></svg></aside>
       <div class="toast" role="status" aria-live="polite" hidden></div>
     </main>
     <dialog id="inspector" aria-labelledby="panel-title"><div id="panel-content"></div></dialog>`;
@@ -277,7 +274,7 @@ async function boot(){
   stamps();
   const overview=()=>{world?.overview();$('#current-region').textContent='世界总览';document.querySelectorAll('.region-nav').forEach(b=>b.classList.remove('active'));$('#overview').classList.add('active');};
   $('#overview').onclick=overview;$('#camera-reset').onclick=()=>world?.resumeWalk();$('#capture-look').onclick=()=>world?.captureMouse();$('.brand').onclick=e=>{e.preventDefault();overview();};
-  document.querySelectorAll<HTMLButtonElement>('.region-nav').forEach(b=>b.onclick=()=>{if(b.dataset.park)world?.focusPark(b.dataset.park);else if(b.dataset.region)world?.focusRegion(b.dataset.region);});
+  document.querySelectorAll<HTMLButtonElement>('.region-nav').forEach(b=>b.onclick=()=>b.dataset.region&&world?.focusRegion(b.dataset.region));
   $('#collections').onclick=()=>collection();$('#favorites').onclick=()=>collection(true);$('#guide').onclick=showGuide;document.addEventListener('open-guide',showGuide);
   store.muted=true;
   const soundLabel=()=>{const text=store.muted?'开启音乐与音效':'暂停音乐与音效';$('#sound').classList.toggle('enabled',!store.muted);$('#sound').setAttribute('aria-label',text);$('#sound').setAttribute('aria-pressed',String(!store.muted));$('#sound').title=text;};
@@ -290,10 +287,9 @@ async function boot(){
   bus.on('demo',m=>{const {demo}=projectLinks(m);if(demo)openExternal(demo);});
   bus.on('move',p=>{$('#coordinate').textContent=`X ${p.x.toFixed(1)} · Z ${p.z.toFixed(1)}`;const marker=document.getElementById('atlas-player');if(marker)marker.setAttribute('transform',`translate(${p.x.toFixed(2)},${p.z.toFixed(2)})`);});
   document.querySelectorAll<SVGGElement>('[data-mini-region]').forEach(g=>{g.addEventListener('click',()=>world?.focusRegion(g.dataset.miniRegion!));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();world?.focusRegion(g.dataset.miniRegion!);}});});
-  document.querySelectorAll<SVGGElement>('[data-mini-park]').forEach(g=>{g.addEventListener('click',()=>world?.focusPark(g.dataset.miniPark!));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();world?.focusPark(g.dataset.miniPark!);}});});
-  bus.on('view',mode=>{$('.main-world').classList.toggle('first-person',mode==='first-person');$('#view-name').textContent=mode==='first-person'?'第一人称探索':'世界地图';$('#capture-look').hidden=mode==='map';$('#look-hint').textContent=mode==='map'?'拖动旋转 · 滚轮缩放':'点击 / 拖动环顾 · Esc 释放鼠标';if(mode==='first-person'){const english=$('.coordinates small').textContent;$('#current-region').textContent=data.regions.find(r=>r.english===english)?.title??parkIslands.find(p=>p.english===english)?.title??'中央枢纽';}});
+  bus.on('view',mode=>{$('.main-world').classList.toggle('first-person',mode==='first-person');$('#view-name').textContent=mode==='first-person'?'第一人称探索':'世界地图';$('#capture-look').hidden=mode==='map';$('#look-hint').textContent=mode==='map'?'拖动旋转 · 滚轮缩放':'点击 / 拖动环顾 · Esc 释放鼠标';if(mode==='first-person'){const english=$('.coordinates small').textContent;$('#current-region').textContent=data.regions.find(r=>r.english===english)?.title??'中央枢纽';}});
   bus.on('look',locked=>{$('.main-world').classList.toggle('mouse-locked',locked);$('#capture-look').textContent=locked?'Esc 释放鼠标':'点击进入环顾';});
-  bus.on('region',id=>{const r=data.regions.find(r=>r.id===id);const park=parkIslands.find(p=>p.id===id);const title=r?.title??park?.title??'中央枢纽';const english=r?.english??park?.english??'XIANGMETA NEXUS';$('#current-region').textContent=title;$('.coordinates small').textContent=english;document.querySelectorAll<HTMLButtonElement>('.region-nav').forEach(b=>b.classList.toggle('active',(b.dataset.region??b.dataset.park)===id));$('#overview').classList.toggle('active',id==='nexus');});
+  bus.on('region',id=>{const r=data.regions.find(r=>r.id===id);$('#current-region').textContent=r?.title??'中央枢纽';$('.coordinates small').textContent=r?.english??'XIANGMETA NEXUS';document.querySelectorAll<HTMLButtonElement>('.region-nav').forEach(b=>b.classList.toggle('active',b.dataset.region===id));$('#overview').classList.toggle('active',id==='nexus');});
   let nearbyModule:Exhibit|null=null,nearbyArtwork:ArtworkInteraction|null=null,nearbyHarbor=false;
   const renderNearby=()=>{
     const m=nearbyArtwork?.module??nearbyModule,actions=nearbyActions(nearbyModule,nearbyArtwork,nearbyHarbor),title=nearbyHarbor?'海风港口':nearbyArtwork?.label??m?.portfolio?.name??m?.title;

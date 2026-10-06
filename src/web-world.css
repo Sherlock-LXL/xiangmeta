@@ -28,8 +28,6 @@
 .mini-atlas .atlas-sea{fill:#13303a;stroke:#5f8a7f4a;stroke-width:.6}
 .mini-atlas .atlas-region circle{fill:var(--accent);fill-opacity:.65;stroke:#f3eadc80;stroke-width:.6;cursor:pointer;transition:fill-opacity .18s}
 .mini-atlas .atlas-region:hover circle,.mini-atlas .atlas-region:focus circle{fill-opacity:1;stroke:#fff}
-.mini-atlas .atlas-park circle{fill:#9bc5b5;fill-opacity:.65;stroke:#f3eadc80;stroke-width:.6;cursor:pointer;transition:fill-opacity .18s}
-.mini-atlas .atlas-park:hover circle,.mini-atlas .atlas-park:focus circle{fill-opacity:1;stroke:#fff}
 .mini-atlas text{fill:#d5e4de;font-size:5.2px;letter-spacing:.3px;text-anchor:middle;paint-order:stroke;stroke:#0b1a21;stroke-width:1.1;pointer-events:none}
 .mini-atlas .atlas-hub{fill:#f4e3b2;stroke:#fff;stroke-width:.4}
 .mini-atlas #atlas-player circle:first-child{fill:#c7eaa0;stroke:#2a4c3a;stroke-width:.5}

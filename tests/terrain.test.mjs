@@ -3,8 +3,6 @@ import assert from 'node:assert/strict';
 import {loadCatalog} from '../backend/catalog.mjs';
 import {groundHeight,regionHeight} from '../shared/terrain-height.mjs';
 import {bridgeLightSpan} from '../shared/bridge-joints.mjs';
-import {nearParkEntrance,parkConnections,parkDeckVisualOffset,parkHeight,parkLinks} from '../shared/park-layout.mjs';
-import {shoreLayout} from '../shared/shore-layout.mjs';
 import {createWalker,advanceWalker} from '../shared/locomotion.mjs';
 test('mountain projects occupy ascending terraces and the arrival meets the sea-level bridge',async()=>{
   const {public:c}=await loadCatalog(process.cwd()),r=c.regions.find(r=>r.terrain);
@@ -37,29 +35,5 @@ test('bridge rails leave open landings and mountain discoveries sit on level pad
   const [x,z]=discovery.position,heights=[];
   for(let i=0;i<24;i++){const a=i/24*Math.PI*2;heights.push(regionHeight(x+Math.cos(a)*1.1,z+Math.sin(a)*1.1,mountain));}
   assert.ok(Math.max(...heights)-Math.min(...heights)<.15,`${discovery.title} must have a level foundation`);
- }
-});
-
-test('public bridge entrances stay clear of shoreline plants and fences',async()=>{
- const {public:c}=await loadCatalog(process.cwd());
- for(const link of parkConnections){
-  const region=c.regions.find(r=>r.id===link.regionId),exhibits=c.modules.filter(m=>m.region===region.id);
-  for(const entry of shoreLayout(region,exhibits)){
-   if(!nearParkEntrance(region.id,entry.fence.x,entry.fence.z,1))continue;
-   assert.equal(entry.fenceClear,false,`${link.id} fence must be removed`);
-   assert.equal(entry.plant,null,`${link.id} planting must be removed`);
-  }
- }
-});
-
-test('public bridge decks render below their shared walking plane at both island joints',async()=>{
- const {public:c}=await loadCatalog(process.cwd());
- assert.ok(parkDeckVisualOffset<=-.02);
- for(const link of parkLinks(c.regions)){
-  for(const [x,y,z] of [link.from,link.to]){
-   const walking=parkHeight(x,z,c.regions);
-   assert.notEqual(walking,null);
-   assert.ok(y+parkDeckVisualOffset<=walking-.02,`${link.id} deck must not be coplanar with its island`);
-  }
  }
 });

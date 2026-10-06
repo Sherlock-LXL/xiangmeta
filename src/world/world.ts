@@ -2,13 +2,11 @@ import {gardenAccents} from './garden-accents';
 import {regionTexture,loadRegionTextures,configurePreviews,readyPreviews,textureStatus} from './lazy-texture';
 import {islandFoundation} from './island-foundation';
 import {renderSettings} from './render-settings';
-import {CoastalPark} from './coastal-park';
 import {regionLandmark} from './region-landmarks';
 import {TravelerEffects} from './traveler-effects';
 import {WorldResonance} from './world-resonance';
 import {WorldWhispers} from './world-whispers';
 import {worldFeatures} from './features';
-import {parkIslands} from '../../shared/park-layout.mjs';
 import {bridgeLightSpan} from '../../shared/bridge-joints.mjs';
 import * as T from 'three';
 import {exhibitPoint,placedCollider} from '../../shared/exhibit-layout.mjs';
@@ -60,7 +58,6 @@ export class World {
   private observer!:ResizeObserver;private events=new AbortController();private disposers:(()=>void)[]=[];
   private parameters=new Map<string,number>();private mixers:T.AnimationMixer[]=[];private projected=new T.Vector3();
   private wonders!:Discoveries;
-  private park!:CoastalPark;
   private traveler?:TravelerEffects;private resonance?:WorldResonance;private whispers?:WorldWhispers;
   private seasons!:Seasons;
   private memories!:Memories;private signatures!:Signatures;private photo!:PhotoCamera;private photoTime={hour:9,cycling:true};private reduced=matchMedia('(prefers-reduced-motion: reduce)');
@@ -178,10 +175,6 @@ export class World {
     }
     this.harborScene=buildHarbor(this.scene,this.obstacles);this.disposers.push(()=>this.harborScene.dispose());
     this.label('⚓ 海风港口',new T.Vector3(0,-1.7,26.5),()=>bus.emit('harbor',undefined),'harbor-label','harbor');
-    this.park=new CoastalPark(this.scene,data.regions,this.obstacles,bus);this.disposers.push(()=>this.park.dispose());
-    for(const place of parkIslands){
-      this.label(`◉ ${place.title}`,new T.Vector3(place.position[0],2.4,place.position[1]-place.radius+1.5),()=>this.focusPark(place.id),'region-label',place.id);
-    }
     const hub=buildHub();this.scene.add(hub);this.disposers.push(batchStatic(hub));
     this.obstacles.push({x:0,z:0,radius:2.6,height:3.1});
     // Four hub piers at distance ~1.78 — slender pillars, not full-radius wall.
@@ -218,7 +211,7 @@ export class World {
     window.addEventListener('keyup',e=>this.keys.delete(e.code),options);window.addEventListener('blur',()=>{this.keys.clear();this.touchSide=this.touchForward=0;this.jumpRequested=false;},options);
     document.addEventListener('visibilitychange',()=>{if(document.hidden){this.keys.clear();this.touchSide=this.touchForward=0;this.jumpRequested=false;this.look.release();}},options);
     if(new URLSearchParams(location.search).has('inspect')){
-      const inspect=()=>({benches:garden.benches,walls:garden.walls,snowDrifts:this.seasons.snowDrifts,accents:accents.entries,discoveries:wonderEntries,rails:garden.rails,resonance:this.resonance?.snapshot??null,traveler:this.traveler?.snapshot??null,whispers:this.whispers?.snapshot??null,signatures:this.signatures?.snapshot??[],parkResponse:this.park.snapshot,harbor:{near:this.nearHarbor,...harbor},clouds:{canopyPosition:this.scene.getObjectByName('weather-cloud-canopy')?.position.toArray(),canopyOrder:this.scene.getObjectByName('weather-cloud-canopy')?.renderOrder,puffsOpaque:!((this.scene.getObjectByName('drifting-clouds') as T.Mesh).material as T.Material).transparent},nearArtwork:this.nearArtwork?.id??null,artworks:this.artworks.map(({module,...a})=>({...a,moduleId:module.id})),weather:this.environment.weatherState,snowmen:this.scene.getObjectsByProperty('name','snowman').length,player:{...this.player},camera:this.camera.position.toArray(),yaw:this.look.yaw,pitch:this.look.pitch,mode:this.mode,calls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hour:this.environment.hour,photo:this.photo.active,photoCamera:this.photo.camera.position.toArray(),gardenRoads:garden.roads,flowerCount:garden.flowerCount,flowerRoots:garden.flowerRoots,shortcuts:this.memories.shortcutPaths,obstacles:this.obstacles,memories:this.memories.entries.map(e=>({id:e.id,x:e.x,z:e.z})),trails:[...this.memories.trailPaths]});
+      const inspect=()=>({benches:garden.benches,walls:garden.walls,snowDrifts:this.seasons.snowDrifts,accents:accents.entries,discoveries:wonderEntries,rails:garden.rails,resonance:this.resonance?.snapshot??null,traveler:this.traveler?.snapshot??null,whispers:this.whispers?.snapshot??null,signatures:this.signatures?.snapshot??[],harbor:{near:this.nearHarbor,...harbor},clouds:{canopyPosition:this.scene.getObjectByName('weather-cloud-canopy')?.position.toArray(),canopyOrder:this.scene.getObjectByName('weather-cloud-canopy')?.renderOrder,puffsOpaque:!((this.scene.getObjectByName('drifting-clouds') as T.Mesh).material as T.Material).transparent},nearArtwork:this.nearArtwork?.id??null,artworks:this.artworks.map(({module,...a})=>({...a,moduleId:module.id})),weather:this.environment.weatherState,snowmen:this.scene.getObjectsByProperty('name','snowman').length,player:{...this.player},camera:this.camera.position.toArray(),yaw:this.look.yaw,pitch:this.look.pitch,mode:this.mode,calls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hour:this.environment.hour,photo:this.photo.active,photoCamera:this.photo.camera.position.toArray(),gardenRoads:garden.roads,flowerCount:garden.flowerCount,flowerRoots:garden.flowerRoots,shortcuts:this.memories.shortcutPaths,obstacles:this.obstacles,memories:this.memories.entries.map(e=>({id:e.id,x:e.x,z:e.z})),trails:[...this.memories.trailPaths]});
       Object.assign(window,{__xiangmetaInspect:()=>({...inspect(),stations:this.stations.map(s=>({...s,hint:this.scene.getObjectByName(`station-${s.id}`)?.getObjectByName('solid-sign')?.userData.subtitle})),textures:textureStatus(),render:{pixelRatio:this.renderer.getPixelRatio(),shadowSize:renderSettings.shadowSize},foundations:this.scene.getObjectsByProperty('name','stratified-island').length})});this.disposers.push(()=>{delete (window as unknown as Record<string,unknown>).__xiangmetaInspect;});
     }
     this.frame=requestAnimationFrame(this.animate);
@@ -297,7 +290,6 @@ export class World {
     this.host.classList.remove('arriving');void this.host.offsetWidth;this.host.classList.add('arriving');this.updateLocation();this.updateNearby();this.bus.emit('sound','ui');
   }
   focusRegion(id:string){const r=this.data.regions.find(r=>r.id===id);if(r)this.teleport(r.position[0]+(r.spawn?.[0]??0),r.position[1]+(r.spawn?.[1]??10),r.position[0],r.position[1]-4);}
-  focusPark(id:string){const place=parkIslands.find(p=>p.id===id);if(!place)return;const [sx,sz]=place.spawn,[lx,lz]=place.look;this.teleport(place.position[0]+sx,place.position[1]+sz,place.position[0]+lx,place.position[1]+lz);}
   focusExhibit(m:Exhibit){this.labels.forEach(l=>l.element.classList.toggle('selected',l.id===m.id));}
   visit(m:Exhibit){const s=this.stations.find(s=>s.id===m.id)!;this.focusExhibit(m);this.teleport(s.approach.x,s.approach.z,s.x,s.z);this.runHook(m.id,'onVisit');}
   private runHook(id:string,event:'onVisit'|'onInteract'){try{this.extensions.get(id)?.hooks?.[event]?.();}catch(error){console.warn(`Module hook ${id} failed`,error);}}
@@ -305,7 +297,6 @@ export class World {
   private syncCamera(){this.camera.position.set(this.player.x,this.player.y+EYE_HEIGHT,this.player.z);this.camera.rotation.set(this.look.pitch,this.look.yaw,0,'YXZ');this.host.dataset.feetHeight=this.player.y.toFixed(3);this.host.dataset.grounded=String(this.player.grounded);}
   private updateLocation(){
     const region=this.data.regions.find(r=>Math.hypot(this.player.x-r.position[0],this.player.z-r.position[1])<r.radius)?.id
-      ??parkIslands.find(p=>Math.hypot(this.player.x-p.position[0],this.player.z-p.position[1])<p.radius)?.id
       ??'nexus';
     if(region!==this.region){this.region=region;loadRegionTextures(region);this.traveler?.enter(region,this.player.x,this.player.z);this.bus.emit('region',region);}
     this.bus.emit('move',{x:this.player.x,z:this.player.z});
@@ -346,7 +337,6 @@ export class World {
     const moving=Math.hypot(this.player.x-previousX,this.player.z-previousZ)>.001;
     this.traveler?.update(motion,this.player.x,this.player.z,this.player.y,this.look.yaw,moving,this.player.grounded,this.reduced.matches,this.region||'nexus');
     this.whispers?.update(motion,this.region||'nexus',moving,this.mode!=='first-person'||this.paused||!!this.near||!!this.nearArtwork||this.nearHarbor,this.environment.hour,this.resonance?.snapshot.complete);
-    this.park.update(motion,this.reduced.matches,this.player.x,this.player.z,worldFeatures.livingParks);
     this.resonance?.update(motion,this.reduced.matches);
     this.guide.position.y=9.5+Math.sin(this.time*1.2)*.1;this.guide.rotation.y+=motion*.35;
     this.harborScene.update(motion);

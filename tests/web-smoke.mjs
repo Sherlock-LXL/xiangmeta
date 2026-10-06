@@ -58,17 +58,10 @@ try{
   await page.locator('#world canvas').waitFor({state:'visible',timeout:15000});
   await page.waitForFunction(()=>Number(document.querySelector('#world')?.dataset.previewReady)>0,null,{timeout:30000});
   await page.locator('#interaction-prompt a[href="https://github.com/Sherlock-LXL/xianglm"]').waitFor({timeout:30000});
-  assert.equal(await page.locator('.future-label').filter({hasText:/TIDAL GARDEN|STAR OBSERVATORY/}).count(),0);
+  assert.equal(await page.locator('[data-park],[data-mini-park]').count(),0);
+  assert.equal(await page.evaluate(()=>window.__xiangmetaInspect().foundations),5);
   assert.equal(await page.evaluate(()=>window.__xiangmetaInspect().resonance.total),4);
   await page.waitForFunction(()=>window.__xiangmetaInspect().signatures.some(effect=>effect.kind==='tokens'&&effect.activity>.4));
-  await page.locator('[data-park="tide-garden"]').click({noWaitAfter:true});
-  await page.locator('#world canvas').focus();
-  await page.keyboard.down('Shift');
-  await page.keyboard.down('w');
-  await page.waitForFunction(()=>window.__xiangmetaInspect().parkResponse.gardenEnergy>.7);
-  await page.keyboard.up('w');
-  await page.keyboard.up('Shift');
-  assert.equal(await page.evaluate(()=>window.__xiangmetaInspect().parkResponse.insideGarden),true);
   await context.close();
 
   const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
@@ -107,7 +100,7 @@ try{
 
   assert.deepEqual(errors,[]);
   assert.deepEqual(failures,[]);
-  console.log('Smoke passed: landing, project link, responsive ambience, resonance and mobile movement.');
+  console.log('Smoke passed: four-island world, project link, responsive ambience, resonance and mobile movement.');
 }finally{
   await browser.close();
   await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));

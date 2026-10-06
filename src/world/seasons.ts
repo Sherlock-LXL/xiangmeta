@@ -8,7 +8,6 @@ import {groundHeight} from '../../shared/terrain-height.mjs';
 import {mountainRoutes,closestRoute,landings} from '../../shared/mountain-route.mjs';
 import {overlaps,pointSegmentDistance} from '../../shared/navigation.mjs';
 import {footprintsOverlap} from '../../shared/decoration-clearance.mjs';
-import {nearParkEntrance} from '../../shared/park-layout.mjs';
 import type {Catalog,Region} from '../core/types';
 import type {Obstacle} from './scenery';
 
@@ -23,7 +22,7 @@ export class Seasons {
       const exhibits=catalog.modules.filter(m=>m.region===r.id),routes=mountainRoutes(r);let seed=1937+r.id.length;
       const random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
       const height=(x:number,z:number)=>groundHeight(x+r.position[0],z+r.position[1],catalog.regions);
-      const clear=(x:number,z:number,margin=.8)=>Math.hypot(x,z)<r.radius-2.4&&!nearParkEntrance(r.id,x,z,margin)&&!(Math.abs(x)<7&&z>8)&&!exhibits.some(m=>Math.hypot(x-m.position[0],z-m.position[1])<5.5+margin)&&!obstacles.some(o=>overlaps(x+r.position[0],z+r.position[1],o,margin))&&(routes.length?!routes.some(road=>closestRoute(x,z,road).distance<road.width/2+margin)&&!landings(r).some(p=>Math.hypot(x-p.x,z-p.z)<p.radius+margin):!onRegionRoute(x,z,r,exhibits,margin));
+      const clear=(x:number,z:number,margin=.8)=>Math.hypot(x,z)<r.radius-2.4&&!(Math.abs(x)<7&&z>8)&&!exhibits.some(m=>Math.hypot(x-m.position[0],z-m.position[1])<5.5+margin)&&!obstacles.some(o=>overlaps(x+r.position[0],z+r.position[1],o,margin))&&(routes.length?!routes.some(road=>closestRoute(x,z,road).distance<road.width/2+margin)&&!landings(r).some(p=>Math.hypot(x-p.x,z-p.z)<p.radius+margin):!onRegionRoute(x,z,r,exhibits,margin));
       if(r.season==='spring'){
         const flowers:FlowerPoint[]=[];for(let i=0;i<1800&&flowers.length<330;i++){const x=(random()*2-1)*r.radius,z=(random()*2-1)*r.radius;if(clear(x,z,.5)){const y=height(x,z);if(Math.max(...[[.3,0],[-.3,0],[0,.3],[0,-.3]].map(([dx,dz])=>Math.abs(height(x+dx,z+dz)-y)))<.18)flowers.push({x,y:y+.06,z});}}
         root.add(flowerDrifts(flowers));
@@ -42,11 +41,11 @@ export class Seasons {
           if(i%4===0){const flower=new T.Group();flower.position.set(px,.42,pz);root.add(flower);for(let n=0;n<7;n++){const t=n*Math.PI*2/7,p=mesh(flower,new T.SphereGeometry(1,8,6),material('#edb5cf',.85,0,'foliage'),Math.cos(t)*.12,.07,Math.sin(t)*.12);p.scale.set(.085,.18,.07);p.rotation.z=Math.cos(t)*.4;p.rotation.x=Math.sin(t)*.4;}mesh(flower,new T.SphereGeometry(.07,8,6),material('#e4cb86'),0,.16);}
         }
         obstacles.push({x:r.position[0]+x,z:r.position[1]+z,radius:2.4,height:.4});
-        for(let i=0;i<24;i++){const a=i*2.4,rad=r.radius-1.2,x=Math.cos(a)*rad,z=Math.sin(a)*rad;if(pointSegmentDistance(x,z,0,0,-r.position[0],-r.position[1])<3||nearParkEntrance(r.id,x,z,1))continue;const shell=mesh(root,new T.SphereGeometry(1,8,6),material('#f4e5cf',.95,0),x,.04,z);shell.scale.set(.11,.045,.15);shell.rotation.y=a;shell.castShadow=false;}
+        for(let i=0;i<24;i++){const a=i*2.4,rad=r.radius-1.2,x=Math.cos(a)*rad,z=Math.sin(a)*rad;if(pointSegmentDistance(x,z,0,0,-r.position[0],-r.position[1])<3)continue;const shell=mesh(root,new T.SphereGeometry(1,8,6),material('#f4e5cf',.95,0),x,.04,z);shell.scale.set(.11,.045,.15);shell.rotation.y=a;shell.castShadow=false;}
       }
       if(r.season==='autumn'){
         for(const [i,[x,z]] of [[-12,5],[12,5],[0,12],[-7,12],[7,12]].entries()){
-          if(nearParkEntrance(r.id,x,z,1.2)||onRegionRoute(x,z,r,exhibits,1.3)||obstacles.some(o=>overlaps(x+r.position[0],z+r.position[1],o,1.2)))continue;
+          if(onRegionRoute(x,z,r,exhibits,1.3)||obstacles.some(o=>overlaps(x+r.position[0],z+r.position[1],o,1.2)))continue;
           tree(root,x,z,.95+i%2*.16,['#da8249','#c86447','#e4b34e'][i%3]);obstacles.push({x:x+r.position[0],z:z+r.position[1],radius:.25,height:4});
         }
         // Lobed maple leaves, instanced in drifts, replace the old wheat field.
@@ -54,7 +53,7 @@ export class Seasons {
         outline.forEach(([x,y],i)=>i?shape.lineTo(x,y):shape.moveTo(x,y));shape.closePath();
         const leafMaterial=new T.MeshStandardMaterial({color:'#ffffff',side:T.DoubleSide,roughness:1,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
         const leaves=new T.InstancedMesh(new T.ShapeGeometry(shape),leafMaterial,1900),pose=new T.Object3D();let count=0;
-        for(let i=0;i<11000&&count<1900;i++){const x=(random()*2-1)*(r.radius-1),z=(random()*2-1)*(r.radius-1);if(Math.hypot(x,z)>r.radius-1||nearParkEntrance(r.id,x,z,.35)||exhibits.some(m=>{const p=exhibitLocal(m,x,z);return Math.abs(p.x)<4.9&&p.z>-8.9&&p.z<4;})||obstacles.some(o=>overlaps(x+r.position[0],z+r.position[1],o,.12)))continue;
+        for(let i=0;i<11000&&count<1900;i++){const x=(random()*2-1)*(r.radius-1),z=(random()*2-1)*(r.radius-1);if(Math.hypot(x,z)>r.radius-1||exhibits.some(m=>{const p=exhibitLocal(m,x,z);return Math.abs(p.x)<4.9&&p.z>-8.9&&p.z<4;})||obstacles.some(o=>overlaps(x+r.position[0],z+r.position[1],o,.12)))continue;
           if(onRegionRoute(x,z,r,exhibits,.2)&&random()>.08)continue;
           const size=.10+random()*.13;pose.position.set(x,.06+random()*.025,z);pose.rotation.set(-Math.PI/2,0,random()*6.28);pose.scale.set(size,size,1);pose.updateMatrix();leaves.setMatrixAt(count,pose.matrix);leaves.setColorAt(count++,new T.Color(['#ce7854','#d99650','#d5aa59','#b9664b','#e6bd6b'][i%5]));}
         leaves.count=count;leaves.receiveShadow=true;root.add(leaves);
@@ -100,7 +99,7 @@ export class Seasons {
       const exhibits=catalog.modules.filter(m=>m.region===r.id);let count=0;
       for(let i=0;i<1400&&count<55;i++){
         const x=(random()*2-1)*r.radius,z=(random()*2-1)*r.radius,halfX=.38+random()*.62,halfZ=.35+random()*.6,wx=x+r.position[0],wz=z+r.position[1],radius=Math.max(halfX,halfZ),footprint={x:wx,z:wz,halfX,halfZ};
-        if(Math.hypot(x,z)+radius>r.radius-3||nearParkEntrance(r.id,x,z,radius)||onRegionRoute(x,z,r,exhibits,radius+.35)||exhibits.some(m=>Math.hypot(x-m.position[0],z-m.position[1])<5.5+radius))continue;
+        if(Math.hypot(x,z)+radius>r.radius-3||onRegionRoute(x,z,r,exhibits,radius+.35)||exhibits.some(m=>Math.hypot(x-m.position[0],z-m.position[1])<5.5+radius))continue;
         if(obstacles.some(o=>footprintsOverlap(footprint,o,.45))||reserved.some(p=>footprintsOverlap(footprint,{...p,radius:1.5},.25))||this.snowDrifts.some(p=>footprintsOverlap(footprint,p,.2)))continue;
         const y=groundHeight(wx,wz,catalog.regions)-.025,h=.09+random()*.07;
         const drift=mesh(root,shape,snow,wx,y,wz);drift.scale.set(halfX,h,halfZ);drift.castShadow=false;

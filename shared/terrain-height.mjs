@@ -1,6 +1,5 @@
 import {mountainRoutes,hillsideRoute,landings,entranceSurface} from './mountain-route.mjs';
 import {harborHeight} from './harbor.mjs';
-import {parkHeight} from './park-layout.mjs';
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
 /** The renderer, walker, route planner and exhibits sample this same surface. */
 export function regionHeight(x,z,region){
@@ -29,7 +28,6 @@ export function regionHeight(x,z,region){
   return t.route?height:height*(1-smooth((distance-(region.radius-5))/4.6));
 }
 export function groundHeight(x,z,regions){
-  const park=parkHeight(x,z,regions);if(park!==null)return park;
   const dock=harborHeight(x,z);if(dock!==null&&Math.hypot(x,z)>=9)return dock;
   for(const r of regions)if(r.terrain&&Math.hypot(x-r.position[0],z-r.position[1])<r.radius)return regionHeight(x-r.position[0],z-r.position[1],r);
   return 0;
