@@ -45,7 +45,7 @@ export function promenade(link:Promenade,arches=false){
   if(arches&&length>8)for(const side of [-1,1]){
     const pts=Array.from({length:25},(_,i)=>{const t=t0+(t1-t0)*i/24;return new T.Vector3(...point(t,side*(w+.1),Math.sin(i/24*Math.PI)*3.5-.32));});
     mesh(g,new T.TubeGeometry(new T.CatmullRomCurve3(pts),40,.105,8,false),stone);
-    for(let i=2;i<23;i+=3){const t=t0+(t1-t0)*i/24;beam(g,point(t,side*(w+.1),.1),point(t,side*(w+.1),Math.sin(i/24*Math.PI)*3.5-.32),.022,bronze);}
+    for(let i=2;i<23;i+=3){const t=t0+(t1-t0)*i/24;beam(g,point(t,side*(w+.1),parkDeckVisualOffset),point(t,side*(w+.1),Math.sin(i/24*Math.PI)*3.5-.32),.022,bronze);}
   }
   return g;
 }
