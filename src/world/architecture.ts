@@ -2,6 +2,7 @@ import {catSculpture} from './cat-sculpture';
 import {worldMirror} from './mirror';
 import * as T from 'three';
 import {surfaceMaterial} from './surfaces';
+import {paintedTree,formForColor} from './vernacular';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { artwork } from './artwork';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -31,7 +32,12 @@ const woodGeometry=(()=>{
 })();
 const barkMaterial=material('#9d8468',.95,.02,'wood');
 const foliageMaterials=new Map<string,T.MeshStandardMaterial>();
+/** Every caller's foliage colour maps onto one of the painted tree forms. */
 export function tree(g:T.Object3D,x:number,z:number,scale=1,color='#b0d9be') {
+  paintedTree(g,x,z,scale*.92,formForColor(color));
+}
+/** The earlier puff-crown tree, retained for small decorative accents. */
+export function puffTree(g:T.Object3D,x:number,z:number,scale=1,color='#b0d9be') {
   mesh(g,woodGeometry,barkMaterial,x,0,z).scale.setScalar(scale);
   if(!foliageMaterials.has(color))foliageMaterials.set(color,material(color,.92,0,'foliage'));
   if(!foliageMaterials.has(color+'-shade'))foliageMaterials.set(color+'-shade',material(new T.Color(color).multiplyScalar(.78).getStyle(),1,0,'foliage'));

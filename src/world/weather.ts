@@ -7,13 +7,17 @@ export class Weather {
   readonly cycle=new WeatherCycle();
   private clouds:T.InstancedMesh;private rain:T.LineSegments;private snow:T.Points;
   private ceiling:T.Mesh<T.PlaneGeometry,T.ShaderMaterial>;
-  private cloudMaterial=new T.MeshStandardMaterial({color:'#fff7e9',roughness:1,emissive:'#dce8ef',emissiveIntensity:.22});
+  private cloudMaterial=new T.MeshStandardMaterial({color:'#fbf6ea',roughness:1,emissive:'#e9e2d0',emissiveIntensity:.3,flatShading:false});
   private pose=new T.Object3D();private time=0;private interval=0;private bases:Float32Array;private precipitationCount=7200;
   private flow={value:0};
   get motionTime(){return this.time;}
   constructor(scene:T.Scene){
-    const puff=new T.SphereGeometry(1,28,18),vertices=puff.attributes.position;
-    for(let i=0;i<vertices.count;i++){const x=vertices.getX(i),y=vertices.getY(i),z=vertices.getZ(i),s=1+.018*Math.sin(x*6+z*4)*Math.sin(y*5-z*3);vertices.setXYZ(i,x*s,y*s,z*s);}puff.computeVertexNormals();
+    // Auspicious-cloud lobes: a flattened, flat-bottomed puff whose underside tucks into a straight brush line.
+    const puff=new T.SphereGeometry(1,28,14),vertices=puff.attributes.position;
+    for(let i=0;i<vertices.count;i++){const x=vertices.getX(i),y=vertices.getY(i),z=vertices.getZ(i),s=1+.03*Math.sin(x*5+z*3);vertices.setXYZ(i,x*s,y<0?y*.18:y*s,z*s);}puff.computeVertexNormals();
+    this.cloudMaterial.onBeforeCompile=shader=>{shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying float vCloudY;').replace('#include <begin_vertex>','#include <begin_vertex>\nvCloudY=position.y;');
+      shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying float vCloudY;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ndiffuseColor.rgb*=mix(.86,1.,smoothstep(-.1,.6,vCloudY));');};
+    this.cloudMaterial.customProgramCacheKey=()=> 'painted-cloud-v1';
     this.clouds=new T.InstancedMesh(puff,this.cloudMaterial,48*6);this.clouds.name='drifting-clouds';this.clouds.instanceMatrix.setUsage(T.DynamicDrawUsage);this.clouds.frustumCulled=false;scene.add(this.clouds);
     const material=new T.ShaderMaterial({side:T.DoubleSide,transparent:true,depthWrite:false,uniforms:{time:{value:0},cover:{value:0},tint:{value:new T.Color()}},vertexShader:'varying vec3 vWorld;void main(){vec4 world=modelMatrix*vec4(position,1.);vWorld=world.xyz;gl_Position=projectionMatrix*viewMatrix*world;}',fragmentShader:`
       uniform float time,cover;uniform vec3 tint;varying vec3 vWorld;
@@ -51,8 +55,8 @@ export class Weather {
   }
   update(dt:number,freeze:boolean,camera:T.Vector3,day:number,reduced=false){
     const state=this.cycle.update(dt,freeze);if(!freeze)this.time+=dt*(.6+state.wind*.4)*(reduced?.45:1);
-    this.flow.value=this.time;this.cloudMaterial.emissiveIntensity=.06+day*.2;
-    this.cloudMaterial.color.set('#71869e').lerp(new T.Color('#fff6e5'),day).lerp(new T.Color('#46566b').lerp(new T.Color('#758897'),day),state.shade*.9).lerp(new T.Color('#93a5bf').lerp(new T.Color('#e2e9f0'),day),state.snow*.65);
+    this.flow.value=this.time;this.cloudMaterial.emissiveIntensity=.08+day*.26;
+    this.cloudMaterial.color.set('#6f7f99').lerp(new T.Color('#fbf5e8'),day).lerp(new T.Color('#4a5868').lerp(new T.Color('#8d9aa1'),day),state.shade*.9).lerp(new T.Color('#97a7be').lerp(new T.Color('#e6ebef'),day),state.snow*.65);
     // The canopy shader has zero alpha below .24 coverage; skip the full-screen pass then.
     this.ceiling.visible=state.cover>.24;
     const uniforms=this.ceiling.material.uniforms;uniforms.time.value=this.time;uniforms.cover.value=state.cover;uniforms.tint.value.copy(this.cloudMaterial.color);
@@ -62,7 +66,8 @@ export class Weather {
         const a=i*2.39996,r=40+i%7*19,activation=i<7?1:T.MathUtils.smoothstep(state.cover,(i-7)/46,(i-7)/46+.15),size=(.001+activation)*(1+state.cover*.6);
         const x=((Math.cos(a)*r+this.time*.72+170)%340+340)%340-170,z=((Math.sin(a)*r+this.time*.25+170)%340+340)%340-170;
         const edge=T.MathUtils.smoothstep(170-Math.max(Math.abs(x),Math.abs(z)),0,16);
-        for(let n=0;n<6;n++){const crown=Math.sin(n/5*Math.PI),width=2.8+Math.sin(i*1.7+n)*.6;this.pose.position.set(x+(n-2.5)*2.25*size,38+i%4*5-state.shade*9+crown*1.6*size,z+Math.sin(n*2.4+i)*1.15*size);this.pose.rotation.set(0,a+n*.3,0);this.pose.scale.set(width*size*edge,(1.05+crown*1.15)*size*edge,(2.45+Math.cos(n+i)*.4)*size*edge);this.pose.updateMatrix();this.clouds.setMatrixAt(i*6+n,this.pose.matrix);}
+        // Long banks of overlapping lobes, wider than tall, sharing one level underside.
+        for(let n=0;n<6;n++){const crown=Math.sin((n+.5)/6*Math.PI),width=2.6+Math.sin(i*1.7+n)*.7,sy=(.75+crown*1.05)*size*edge;this.pose.position.set(x+(n-2.5)*2.7*size,38+i%4*5-state.shade*9+sy*.18,z+Math.sin(n*2.4+i)*1.4*size);this.pose.rotation.set(0,a*.15+n*.08,0);this.pose.scale.set(width*size*edge,sy,(2.1+Math.cos(n+i)*.5)*size*edge);this.pose.updateMatrix();this.clouds.setMatrixAt(i*6+n,this.pose.matrix);}
       }this.clouds.instanceMatrix.needsUpdate=true;
     }
     this.rain.visible=state.rain>.005;this.snow.visible=state.snow>.005;

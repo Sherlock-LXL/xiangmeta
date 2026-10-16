@@ -49,7 +49,7 @@ export class Memories {
     constellation.forEach((p,i)=>{mesh(atlas,new T.OctahedronGeometry(.09,0),starlight,...p as [number,number,number]);if(i)segments.push(...constellation[i-1],...p);});
     const chart=new T.BufferGeometry();chart.setAttribute('position',new T.Float32BufferAttribute(segments,3));atlas.add(new T.LineSegments(chart,new T.LineBasicMaterial({color:'#badfe5',transparent:true,opacity:.8})));
     obstacles.push({x:0,z:4.55,radius:.65,height:1.85});
-    const orbit=mesh(frames,new T.TorusGeometry(3.1,.018,6,96),material('#b9c9ba'),0,6.3);orbit.rotation.x=Math.PI/2;
+    // The stars hang inside the hub's armillary sphere; its rings replace a separate orbit.
     const lines:number[]=[],ordered=growthEntries(this.entries) as MemoryFragment[];
     for(let i=1;i<this.entries.length;i++){
       const a=this.stars.get(this.entries[i-1].id)!.sky.position,b=this.stars.get(this.entries[i].id)!.sky.position;lines.push(...a.toArray(),...b.toArray());
