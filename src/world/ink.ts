@@ -9,6 +9,13 @@ export const pigment={
   leadWhite:'#f3eee2',celadon:'#a9c8b4',bronze:'#8a6a3e',bronzeLight:'#c3a067',stone:'#d9d1bf',stoneDeep:'#9b9484',timber:'#6f4a33',tile:'#59626a'
 } as const;
 
+/** Each island's data colour is a pastel; in the painting it is laid as the matching mineral pigment. */
+const accents:Record<string,string>={'#ebbdcf':'#b5564e','#cbdde9':'#3f6f8f','#e3c385':'#b0823c','#acd9c5':'#4f8f78'};
+export function pigmentAccent(color:T.ColorRepresentation){
+  const c=new T.Color(color),known=accents['#'+c.getHexString()];if(known)return known;
+  const hsl={h:0,s:0,l:0};c.getHSL(hsl);return '#'+new T.Color().setHSL(hsl.h,Math.min(.5,hsl.s*.7+.1),.42).getHexString();
+}
+
 let installed=false;
 /** Every built-in material shares two painted conventions: mist that settles over the sea, and a gouache light ramp. */
 export function installInkShading(){
