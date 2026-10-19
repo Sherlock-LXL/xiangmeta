@@ -130,3 +130,50 @@ label{color:var(--ink-soft)}
 /* The seal glyph in the brand and loading leaf is carved, not drawn. */
 .brand-symbol,.web-loading .loading-symbol,.guide-orb{font-family:var(--serif);font-weight:700}
 .brand-symbol{font-size:24px}
+/* Mini atlas: islands are laid in their mineral pigment, as on the painted map. */
+.mini-atlas .atlas-region circle{fill:var(--pigment,var(--accent));fill-opacity:.42;stroke:rgba(43,40,36,.6);stroke-width:.6}
+.mini-atlas .atlas-region:hover circle,.mini-atlas .atlas-region:focus circle{fill-opacity:.7;stroke:var(--seal)}
+.mini-atlas text{fill:var(--ink);stroke:#f3ead8;stroke-width:1.4;font-family:var(--serif);letter-spacing:.4px}
+.mini-atlas .atlas-sea{fill:#dfe4d6;stroke:rgba(53,95,122,.32)}
+/* The view badge hangs beneath the fan map like a tag, never under it (narrow screens keep their own placement). */
+@media(min-width:761px){.first-person .view-badge{top:282px;right:28px}}
+@media(min-width:761px) and (max-width:1180px){.first-person .view-badge{top:236px;right:20px}}
+/* Memory constellation: a night leaf of indigo silk, stars laid in gold leaf; collected stars glow, waiting ones are faint outlines. */
+.memory-atlas{border-radius:3px;background-color:#24394a;background-image:radial-gradient(ellipse at 50% 42%,#33505e 0%,#24394a 55%,#1b2b39 100%);border:1px solid rgba(58,48,38,.5);box-shadow:inset 0 0 0 5px rgba(246,240,227,.08),inset 0 0 0 6px rgba(201,170,108,.32)}
+.memory-atlas::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 30% at 50% 108%,rgba(111,147,163,.35),transparent 70%);pointer-events:none}
+.memory-atlas line{stroke:#c9aa6c;opacity:.35}
+.memory-star{color:rgba(232,214,170,.42)}.memory-star>.action-icon{filter:none}
+.memory-star.found{color:#e9c77f}.memory-star.found>.action-icon{filter:drop-shadow(0 0 7px rgba(255,214,140,.65))}
+.memory-star:hover{color:#f3dba3}
+.memory-star small{color:rgba(239,230,210,.62)}
+.memory-index button{border-radius:3px;border:1px solid var(--rule)}
+.memory-index span{font-family:var(--serif);color:var(--seal)}
+/* Square, mounted corners everywhere the old rounded cards remain. */
+.stamp-card,.harbor-route,.album-cover,.album-detail,.media-card,.connection-card,.product-output,.fact-grid,.time-presets button,.memory-index button,.harbor-route button:disabled{border-radius:3px}
+.album-cover img{border-radius:2px}
+.album-cover.active{border-color:var(--seal);box-shadow:inset 0 0 0 1px var(--seal)}
+.connection-card{background:linear-gradient(115deg,rgba(239,229,208,.5),rgba(248,243,232,.7));border-color:var(--rule)}
+.connection-card:hover{border-color:var(--seal)}
+.stamp-symbol{border-radius:3px;border-color:rgba(58,48,38,.32);color:var(--ink-faint)}
+.found .stamp-symbol{color:#f7efdf}
+.growth-list article:before{background:var(--seal);box-shadow:0 0 0 4px #f8f3e8,0 0 0 5px rgba(163,74,53,.3);border-radius:1px;transform:rotate(45deg);width:8px;height:8px;left:-28px}
+.time-presets button.active,.time-presets button[aria-pressed=true]{border-color:var(--seal);background:#f3e4cf}
+/* Product mode: tabs and controls take the island's pigment; the inactive tab stays legible. */
+.product-mode .panel-tabs button{color:var(--ink-faint)}
+.product-mode .panel-tabs .active{color:var(--product-accent);border-bottom-color:var(--product-accent)}
+.panel-tabs button span{color:inherit;opacity:.7}
+input[type=checkbox]{accent-color:var(--seal)}
+input[type=range]{accent-color:var(--seal)}
+/* Toast: a slip hung from the top band, clear of the heading, map and the nearby slip. */
+.toast{bottom:auto;top:92px;left:50%;transform:translateX(-50%);max-width:min(400px,calc(100% - 520px));text-align:center}
+@media(max-width:1180px){.toast{max-width:min(360px,calc(100% - 420px))}}
+@media(max-width:900px){.toast{top:auto;bottom:132px;left:15px;right:15px;transform:none;max-width:none}}
+/* Topbar glyph buttons share one optical size. */
+.journal-button,.sky-clock{border-radius:3px;font-family:var(--serif)}
+.journal-button span,.sky-clock span{font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink-soft)}
+.icon-button{border-radius:3px}
+#photo-open svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+@media (max-width:900px) and (pointer:coarse){
+  html.touch-experience .toast,html.touch-experience #trail-guide{top:188px;bottom:auto;left:14px;right:14px;transform:none;max-width:none}
+  html.touch-experience .icon-button{border-radius:50%}
+}

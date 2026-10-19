@@ -15,6 +15,7 @@ import { EventBus } from './core/events';
 import { VisitorStore } from './core/storage';
 import { discoveries,type Exhibit } from './core/types';
 import { World } from './world/world';
+import {pigmentAccent} from './world/ink';
 import { AudioSystem } from './audio/audio';
 import { guide } from './agents/guide';
 import {mountResearch} from './core/research-lab';
@@ -43,7 +44,7 @@ async function boot(){
       <div class="side-caption">EXPLORATION <span>探索无界</span></div>
       <button class="nav-overview active" id="overview" aria-label="世界总览" title="世界总览">${navIcon('world')} <span>世界总览</span><span class="nav-end">⌘</span></button>
       <div class="nav-section-label">探索大陆</div>
-      <nav id="regions">${data.regions.map((r,i)=>`<button class="region-nav" data-region="${r.id}" aria-label="${escape(r.title)}" title="${escape(r.title)}" style="--accent:${r.color}">${navIcon(['mountain','science','museum','studio'][i])}<span>${escape(r.title)}<small>${escape(r.english)}</small></span><span class="nav-end">${diagonalArrow}</span></button>`).join('')}</nav>
+      <nav id="regions">${data.regions.map((r,i)=>`<button class="region-nav" data-region="${r.id}" aria-label="${escape(r.title)}" title="${escape(r.title)}" style="--accent:${r.color};--pigment:${pigmentAccent(r.color)}">${navIcon(['mountain','science','museum','studio'][i])}<span>${escape(r.title)}<small>${escape(r.english)}</small></span><span class="nav-end">${diagonalArrow}</span></button>`).join('')}</nav>
       <div class="side-divider"></div>
       <button class="secondary-nav" id="collections" aria-label="展品索引" title="展品索引">${navIcon('collections')} <span>展品索引</span><b>${String(data.modules.length).padStart(2,'0')}</b></button>
       <button class="secondary-nav" id="favorites" aria-label="我的收藏" title="我的收藏">${navIcon('favorites')} <span>我的收藏</span><b id="favorite-count">${store.favorites.size}</b></button>
@@ -63,7 +64,7 @@ async function boot(){
       <button class="guide-card" id="guide"><span class="guide-orb">✦</span><span><b>世界向导</b><small>下一站，想去哪里？</small></span><span>${diagonalArrow}</span></button>
       ${touchExperience?'<div class="touch-controls" id="touch-controls" aria-label="触控探索"><div class="touch-joystick" id="touch-joystick" aria-label="拖动摇杆移动"><div class="touch-joystick-knob"></div><small>移动</small></div><div class="touch-look-hint">拖动画面环顾</div><button class="touch-jump" id="touch-jump" aria-label="跳跃"><span>↑</span><small>跳跃</small></button></div>':''}
       <div class="compass" aria-hidden="true">N<br><span>✧</span></div>
-      <aside class="mini-atlas" id="mini-atlas" aria-label="世界迷你地图"><svg viewBox="-100 -100 200 200" role="img" aria-label="迷你地图"><circle class="atlas-sea" cx="0" cy="0" r="99"/>${data.regions.map(r=>`<g class="atlas-region" data-mini-region="${r.id}" style="--accent:${r.color}" tabindex="0" role="button" aria-label="${escape(r.title)}"><circle cx="${r.position[0]}" cy="${r.position[1]}" r="${r.radius}"/><text x="${r.position[0]}" y="${r.position[1]+r.radius+6}">${escape(r.english)}</text></g>`).join('')}<circle class="atlas-hub" cx="0" cy="0" r="2.4"/><g id="atlas-player" transform="translate(0,0)"><circle r="2.8"/><circle class="atlas-pulse" r="4.4"/></g></svg></aside>
+      <aside class="mini-atlas" id="mini-atlas" aria-label="世界迷你地图"><svg viewBox="-100 -100 200 200" role="img" aria-label="迷你地图"><circle class="atlas-sea" cx="0" cy="0" r="99"/>${data.regions.map(r=>`<g class="atlas-region" data-mini-region="${r.id}" style="--accent:${r.color};--pigment:${pigmentAccent(r.color)}" tabindex="0" role="button" aria-label="${escape(r.title)}"><circle cx="${r.position[0]}" cy="${r.position[1]}" r="${r.radius}"/><text x="${r.position[0]}" y="${r.position[1]+r.radius+6}">${escape(r.english)}</text></g>`).join('')}<circle class="atlas-hub" cx="0" cy="0" r="2.4"/><g id="atlas-player" transform="translate(0,0)"><circle r="2.8"/><circle class="atlas-pulse" r="4.4"/></g></svg></aside>
       <div class="toast" role="status" aria-live="polite" hidden></div>
     </main>
     <dialog id="inspector" aria-labelledby="panel-title"><div id="panel-content"></div></dialog>`;
@@ -75,7 +76,7 @@ async function boot(){
   const seasons={spring:'春 · 桃花山径',summer:'夏 · 海风绿洲',autumn:'秋 · 金色回忆',winter:'冬 · 初雪实验室'};
   data.regions.forEach(r=>{const small=document.querySelector(`[data-region="${r.id}"] small`);if(small&&r.season)small.textContent=seasons[r.season];});
   $('.top-actions').insertAdjacentHTML('afterbegin','<button id="sky-settings" class="sky-clock" title="调整海岛时光" aria-label="海岛时光">◒ <span id="sky-clock">09:00</span></button>');
-  $('.top-actions').insertAdjacentHTML('afterbegin','<button id="memory-open" class="journal-button" aria-label="记忆星图" title="记忆星图">✶ <span id="memory-count">0</span></button><button id="photo-open" class="icon-button" aria-label="摄影模式" title="摄影模式 · P">▧</button>');
+  $('.top-actions').insertAdjacentHTML('afterbegin','<button id="memory-open" class="journal-button" aria-label="记忆星图" title="记忆星图">✶ <span id="memory-count">0</span></button><button id="photo-open" class="icon-button" aria-label="摄影模式" title="摄影模式 · P"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.6-2.4h6.8L17 8h3v11H4Z"/><circle cx="12" cy="13" r="3.4"/></svg></button>');
   $('#collections').insertAdjacentHTML('beforebegin','<button id="growth-open" aria-label="成长路径" title="成长路径" class="secondary-nav">'+navIcon('growth')+' <span>成长路径</span><b>EXPLORE</b></button>');
   if(touchExperience){
     $('.side-bottom').insertAdjacentHTML('beforebegin','<div class="mobile-tools"><span>探索工具</span><button data-mobile-tool="sky-settings">海岛时光</button><button data-mobile-tool="memory-open">记忆星图</button><button data-mobile-tool="photo-open">摄影模式</button><button data-mobile-tool="journal">旅行印记</button><button data-mobile-tool="guide">世界向导</button><button data-mobile-tool="help">操作指南</button></div>');
@@ -142,7 +143,7 @@ async function boot(){
       </section>
       <section id="story" hidden><div class="timeline">${m.story.map(s=>`<article><h3>${escape(s.title)}</h3><p>${escape(s.body)}</p></article>`).join('')}</div></section>
       <footer class="panel-footer"><button class="quiet-button" id="visit">${actionIcon('visit')}<span>抵达展台</span></button><button class="quiet-button" id="favorite" aria-pressed="${store.favorites.has(m.id)}">${actionIcon('favorite',store.favorites.has(m.id))}<span>${store.favorites.has(m.id)?'已收藏':'收藏'}</span></button><button class="quiet-button back-world" id="back-world">${actionIcon('back')}<span>返回 · Esc</span></button></footer>`);
-    dialog.classList.toggle('product-mode',product);dialog.dataset.kind=m.visual;dialog.style.setProperty('--product-accent',region.color);mountAlbumGallery($('#experience'),m,albumId);
+    dialog.classList.toggle('product-mode',product);dialog.dataset.kind=m.visual;dialog.style.setProperty('--product-accent',pigmentAccent(region.color));mountAlbumGallery($('#experience'),m,albumId);
     if(m.world?.connections.length){$('#experience').insertAdjacentHTML('beforeend',`<div class="connection-list"><small>另一条线索 / THREADS</small>${m.world.connections.map(link=>`<button class="connection-card" data-connection="${link.target}"><b>${escape(link.title)} ${diagonalArrow}</b><span>${escape(link.body)}</span></button>`).join('')}</div>`);dialog.querySelectorAll<HTMLButtonElement>('[data-connection]').forEach(b=>b.onclick=()=>{world?.visit(data.modules.find(m=>m.id===b.dataset.connection)!);closePanel();});}
     if(m.world?.capabilities.includes('gallery'))dialog.querySelectorAll<HTMLElement>('.media-card').forEach((card,i)=>{if(m.media[i].kind!=='image')return;const imageIndex=m.media.slice(0,i).filter(item=>item.kind==='image').length;const b=document.createElement('button');b.className='quiet-button';b.innerHTML=`沉浸观看 ${diagonalArrow}`;b.dataset.immerse=String(imageIndex);b.onclick=()=>immerse(m,imageIndex);card.append(b);});
     $('#use-product').onclick=()=>openExhibit(m,true);$('#back-world').onclick=closePanel;
