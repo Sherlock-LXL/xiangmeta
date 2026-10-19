@@ -28,7 +28,7 @@ export function buildBridge(region:Region){
   // Barrel vaults and a voussoir ring proud of each face.
   const vault=kit.stoneDark().clone();vault.side=T.DoubleSide;
   for(const c of centres){
-    const barrel=place(root,new T.CylinderGeometry(radius,radius,HALF*2-.9,24,1,true,Math.PI/2,Math.PI),vault,0,spring,c);barrel.rotation.z=Math.PI/2;barrel.castShadow=false;
+    const barrel=place(root,new T.CylinderGeometry(radius,radius,HALF*2-.9,24,1,true,0,Math.PI),vault,0,spring,c);barrel.rotation.z=Math.PI/2;barrel.castShadow=false;
     const ring=new T.Shape();ring.absarc(0,0,radius+.32,0,Math.PI,false);ring.lineTo(-radius,0);ring.absarc(0,0,radius,Math.PI,0,true);ring.closePath();
     const voussoir=new T.ExtrudeGeometry(ring,{depth:.06,bevelEnabled:false,curveSegments:20});voussoir.rotateY(Math.PI/2);
     for(const s of [-1,1])place(root,voussoir,marble,s>0?HALF+.005:-HALF-.065,spring,c);

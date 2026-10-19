@@ -25,7 +25,8 @@ export function islandFoundation(radius:number,x:number,z:number,openings:{angle
       if(row&&r<previous[j]-.12)r=previous[j]-.12;ring.push(r);
       const y=height+(row===0||row===profile.length-1?0:Math.sin(a*9+row*1.3+seed)*.07);
       positions.push(Math.cos(a)*r,y,Math.sin(a)*r);uvs.push(j/sectors*radius*2,-height/2);
-      if(row<profile.length-1&&j<sectors){const p=row*(sectors+1)+j,q=p+sectors+1;indices.push(p,q,p+1,p+1,q,q+1);}
+      // Wound so faces (and the shelf test below) look out to sea.
+      if(row<profile.length-1&&j<sectors){const p=row*(sectors+1)+j,q=p+sectors+1;indices.push(p,p+1,q,q,p+1,q+1);}
     }
     previous=ring;
   }
