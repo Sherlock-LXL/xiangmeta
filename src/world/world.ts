@@ -306,7 +306,9 @@ export class World {
     this.resonance?.update(motion,this.reduced.matches);
     this.guide.position.y=hubLayout.guideY+Math.sin(this.time*1.2)*.1;this.guide.rotation.y+=motion*.35;this.hubMotion(this.reduced.matches?0:motion);
     this.harborScene.update(motion);
-    this.environment.update(dt,this.photo.active,this.photo.active?this.photo.camera.position:this.camera.position);this.signatures.update(motion,this.environment.hour,this.reduced.matches,this.player.x,this.player.z,worldFeatures.responsiveSignatures);
+    // Sky, stars and cloud parting follow the eye that is actually drawing the frame.
+    const camera=this.photo.active?this.photo.camera:this.mode==='map'?this.mapCamera:this.camera;
+    this.environment.update(dt,this.photo.active,camera.position);this.signatures.update(motion,this.environment.hour,this.reduced.matches,this.player.x,this.player.z,worldFeatures.responsiveSignatures);
     this.seasons.update(motion,this.reduced.matches);
     for(const [id,e] of this.extensions)if(e.scene?.update)try{e.scene.update(motion,this.environment.hour);}catch(error){console.warn(`Module animation ${id} stopped`,error);e.scene.update=undefined;}
     for(const [id,obj] of this.objects){const pulse=obj.getObjectByName('pulse');if(pulse){const value=this.parameters.get(id)??.5;pulse.scale.setScalar(.7+value*.35+Math.sin(this.time*(1+value*4))*.15);}}
@@ -318,7 +320,6 @@ export class World {
     // The sun completes an orbit in 16 minutes; three shadow updates per second retain its motion
     // without redrawing every static island at the same rate as the first-person camera.
     this.shadowTime+=dt;if(this.shadowTime>=renderSettings.shadowInterval){this.renderer.shadowMap.needsUpdate=true;this.shadowTime=0;}
-    const camera=this.photo.active?this.photo.camera:this.mode==='map'?this.mapCamera:this.camera;
     this.draw();
     this.labelTime+=dt;
     if(!this.photo.active&&this.labelTime>=1/30){this.labelTime=0;for(const l of this.labels){

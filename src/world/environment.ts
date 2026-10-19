@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {renderSettings} from './render-settings';
 import { daylight } from '../../shared/atmosphere.mjs';
+import {harbor} from '../../shared/harbor.mjs';
 import { Weather } from './weather';
 import {exchangeIsland,robotDistrict,researchInstitute} from './future-landmarks';
 import {batchStatic} from './optimizer';
@@ -57,7 +58,9 @@ export class Environment {
       }`});
     this.sky=new T.Mesh(new T.SphereGeometry(500,48,24),this.skyMaterial);this.sky.name='silk-sky';this.sky.renderOrder=-100;this.sky.frustumCulled=false;
     scene.add(this.sky,this.ambient,this.light,this.light.target,this.sun,this.moon);
-    this.weather=new Weather(scene);this.sun.material.transparent=true;this.moon.material.transparent=true;
+    // Bounding spheres of the hub, the harbour and the four islands; the mountain carries its pagoda above the ridge.
+    const islands=[{x:0,y:3,z:0,radius:10},{x:0,y:-3,z:(harbor.rampStart+harbor.deckEnd)/2,radius:11},...regions.map(r=>({x:r.position[0],y:r.terrain?6:1,z:r.position[1],radius:r.radius+(r.terrain?4:1.5)}))];
+    this.weather=new Weather(scene,islands);this.sun.material.transparent=true;this.moon.material.transparent=true;
     this.sun.name='orbit-sun';this.moon.name='orbit-moon';this.sun.renderOrder=this.moon.renderOrder=-30;
     const haloCanvas=document.createElement('canvas');haloCanvas.width=haloCanvas.height=128;
     const ctx=haloCanvas.getContext('2d')!,gradient=ctx.createRadialGradient(64,64,6,64,64,64);
