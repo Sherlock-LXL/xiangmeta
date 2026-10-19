@@ -92,7 +92,7 @@ export class World {
     this.photo=new PhotoCamera(canvas);
     host.dataset.view=this.mode;host.dataset.eyeHeight=String(EYE_HEIGHT);
     this.environment=new Environment(this.scene,data.regions);
-    const lightRoom=new RoomEnvironment(),pmrem=new T.PMREMGenerator(this.renderer),reflection=pmrem.fromScene(lightRoom,.06);
+    const lightRoom=new RoomEnvironment(),pmrem=new T.PMREMGenerator(this.renderer),reflection=pmrem.fromScene(lightRoom,.04);
     this.scene.environment=reflection.texture;this.scene.environmentIntensity=.24;lightRoom.dispose();pmrem.dispose();this.disposers.push(()=>reflection.dispose());
     for(const place of horizons)this.label('◇ '+place.title,new T.Vector3(...place.target),()=>bus.emit('horizon',place.id),'future-label',place.id);
     // Map inertia and pointer handlers can never write into the walking camera.
