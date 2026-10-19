@@ -5,6 +5,7 @@ import './style.css';
 import './refined-ui.css';
 import './web-world.css';
 import './mobile.css';
+import './album.css';
 import {sitePath,projectLinks,externalAttrs} from './core/portfolio';
 import {nearbyActions,type InteractionKey} from './core/nearby-actions';
 import {mountAlbumGallery} from './core/album-gallery';
@@ -30,7 +31,7 @@ const app=document.querySelector<HTMLDivElement>('#app')!;
 const touchExperience=document.documentElement.classList.contains('touch-experience');
 const escape=(value:unknown)=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 const icon=(name:string)=>({world:'◈',mountain:'△',science:'◌',museum:'▥',studio:'♫',guide:'✦',arrow:diagonalArrow,sound:'♪',map:'⌖',close:'×',star:'☆'}[name]??'◈');
-app.innerHTML='<div class="web-loading"><span class="loading-symbol">✳</span><h1>XiangMeta</h1><p>正在读取项目与世界档案…</p><progress aria-label="读取世界档案"></progress></div>';
+app.innerHTML='<div class="web-loading"><span class="loading-symbol" aria-hidden="true">象</span><h1>XiangMeta</h1><span class="loading-subtitle">山海册页 · 一卷正在展开的个人世界</span><p>正在读取项目与世界档案…</p><progress aria-label="读取世界档案"></progress></div>';
 async function boot(){
   const data=await catalog();const bus=new EventBus(),store=new VisitorStore(),audio=new AudioSystem(bus,data.audio,(text,playing)=>{
     const caption=document.querySelector<HTMLElement>('#music-caption');if(caption){caption.textContent='♫ '+text;caption.dataset.playing=String(playing);}
@@ -38,7 +39,7 @@ async function boot(){
   if(new URLSearchParams(location.search).has('inspect'))Object.assign(window,{__xiangmetaAudio:()=>audio.snapshot});
   app.innerHTML=`
     <aside class="sidebar">
-      <a class="brand" href="#" aria-label="返回世界总览"><span class="brand-symbol">✳</span><span>XiangMeta<small>A PERSONAL UNIVERSE</small></span></a>
+      <a class="brand" href="#" aria-label="返回世界总览"><span class="brand-symbol" aria-hidden="true">象</span><span>XiangMeta<small>A PERSONAL UNIVERSE</small></span></a>
       <div class="side-caption">EXPLORATION <span>探索无界</span></div>
       <button class="nav-overview active" id="overview" aria-label="世界总览" title="世界总览">${navIcon('world')} <span>世界总览</span><span class="nav-end">⌘</span></button>
       <div class="nav-section-label">探索大陆</div>
@@ -52,7 +53,7 @@ async function boot(){
     <main class="main-world first-person">
       <header class="topbar"><div class="topbar-location">${touchExperience?'<button class="icon-button mobile-menu-button" id="mobile-menu" aria-label="打开探索菜单" aria-expanded="false">☰</button>':''}<span class="breadcrumb">我的数字宇宙</span><span class="slash">/</span><span id="current-region">世界总览</span></div><div class="top-actions"><span class="local-badge"><span class="status-dot"></span> 本地世界</span><button class="icon-button" id="sound" aria-label="开启声音" title="开启声音"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l11-3v13M9 9l11-3"/><ellipse cx="6" cy="18" rx="3" ry="2.5"/><ellipse cx="17" cy="16" rx="3" ry="2.5"/></svg><span class="muted-slash" aria-hidden="true"></span></button><button class="journal-button" id="journal" aria-label="旅行印记" title="旅行印记">✧ <span id="stamp-count"></span></button><button class="icon-button" id="help" aria-label="操作指南">?</button></div></header>
       <section id="world" aria-label="可探索的 3D 世界"></section>
-      <div class="world-heading"><div class="eyebrow"><span class="line"></span> THE LIVING ATLAS</div><h1>一个世界，无限可能<span>。</span></h1><p>让好奇心带路，让每一次创造成为新的大陆。</p></div>
+      <div class="world-heading"><div class="eyebrow"><span class="line"></span> 山海册页 · ALBUM OF MOUNTAINS AND SEAS</div><h1>一卷山海，无限可能<span>。</span></h1><p>让好奇心带路，让每一次创造成为画卷中新的岛屿。</p></div>
       <div class="world-meta"><span class="status-dot"></span> ${data.regions.length} REGIONS <span class="meta-divider">/</span> ${String(data.modules.length).padStart(2,'0')} EXHIBITS <span class="meta-divider">/</span> ALWAYS GROWING</div>
       <div class="crosshair" aria-hidden="true"></div>
       <div class="interaction-prompt" id="interaction-prompt" hidden></div>
@@ -225,7 +226,7 @@ async function boot(){
     const route=(q:string)=>{const answer=guide(q,data);$('#guide-results').innerHTML=`<p class="panel-description">${escape(answer.text)}</p>${answer.exhibits.map(m=>`<button class="collection-item" data-exhibit="${m.id}"><span><b>${escape(m.title)}</b><small>${escape(m.subtitle)}</small></span><span>${diagonalArrow}</span></button>`).join('')}`;wireExhibits();};
     $<HTMLFormElement>('#guide-form').onsubmit=e=>{e.preventDefault();route($<HTMLInputElement>('#guide-query').value);};wireExhibits();
   }
-  app.insertAdjacentHTML('beforeend',`<div class="web-loading" id="world-loading"><span class="loading-symbol">✳</span><h1>XiangMeta</h1><p id="load-label" role="status">正在构建群岛…</p><progress id="world-progress" max="100" value="0" aria-label="构建世界"></progress><small id="load-percent">0%</small><a href="${sitePath('projects/')}">浏览项目 →</a></div>`);
+  app.insertAdjacentHTML('beforeend',`<div class="web-loading" id="world-loading"><span class="loading-symbol" aria-hidden="true">象</span><h1>XiangMeta</h1><span class="loading-subtitle">山海册页 · 一卷正在展开的个人世界</span><p id="load-label" role="status">正在构建群岛…</p><progress id="world-progress" max="100" value="0" aria-label="构建世界"></progress><small id="load-percent">0%</small><a href="${sitePath('projects/')}">浏览项目 →</a></div>`);
   try{
     world=await World.create($('#world'),data,bus,store.discoveries,store.memories,(done,total,label)=>{
       const percent=Math.round(done/total*100);$<HTMLProgressElement>('#world-progress').value=percent;$('#load-percent').textContent=`${percent}%`;$('#load-label').textContent=`正在准备 · ${label}`;
