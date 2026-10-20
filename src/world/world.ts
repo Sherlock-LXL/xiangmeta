@@ -42,6 +42,7 @@ import { EYE_HEIGHT,nearestStation,lookAngles } from '../../shared/interaction.m
 import {nearbyActions,actionHint,type InteractionKey} from '../core/nearby-actions';
 import type { Catalog,Exhibit,ArtworkInteraction } from '../core/types';
 import type { EventBus } from '../core/events';
+import {AmbientLife} from './ambient-life';
 type Station={id:string;x:number;z:number;approach:{x:number;z:number}};
 export class World {
   private scene=new T.Scene();private camera=new T.PerspectiveCamera(68,1,.08,900);
@@ -60,6 +61,7 @@ export class World {
   private parameters=new Map<string,number>();private mixers:T.AnimationMixer[]=[];private projected=new T.Vector3();
   private wonders!:Discoveries;
   private traveler?:TravelerEffects;private resonance?:WorldResonance;private whispers?:WorldWhispers;private hubMotion=(dt:number)=>{void dt;};
+  private ambient!:AmbientLife;
   private seasons!:Seasons;
   private memories!:Memories;private signatures!:Signatures;private photo!:PhotoCamera;private photoTime={hour:9,cycling:true};private reduced=matchMedia('(prefers-reduced-motion: reduce)');
   private extensions=new Map<string,ReturnType<typeof moduleExtensions>>();
@@ -103,7 +105,10 @@ export class World {
     yield '中央枢纽与海面';
     for(const r of data.regions){
       const exhibits=data.modules.filter(m=>m.region===r.id);
-      const [x,z]=r.position;this.island(x,z,r.radius,r.color,exhibits,r,[{angle:Math.atan2(-z,-x),half:4/r.radius}]);
+      const [x,z]=r.position,openings=[{angle:Math.atan2(-z,-x),half:4/r.radius}];
+      // Keep the harbour mouth between the two northern islands free of shoreline boulders.
+      if(z>0)openings.push({angle:Math.atan2(31-z,-x),half:.32});
+      this.island(x,z,r.radius,r.color,exhibits,r,openings);
       const bridge=buildBridge(r);this.scene.add(bridge);this.disposers.push(batchStatic(bridge));
       const scenery=r.terrain?mountainScenery(r,exhibits,this.obstacles):dressRegion(r,exhibits,this.obstacles);this.scene.add(scenery);this.disposers.push(batchStatic(scenery));
       const landmark=regionLandmark(r);
@@ -150,6 +155,7 @@ export class World {
     this.wonders=new Discoveries(this.scene,wonderEntries,this.obstacles,bus,found);this.disposers.push(()=>this.wonders.dispose());
     const garden=buildGardenRoutes(this.scene,data,this.obstacles);this.disposers.push(garden.release);
     this.seasons=new Seasons(this.scene,data,this.obstacles);this.disposers.push(()=>this.seasons.dispose());
+    this.ambient=new AmbientLife(this.scene);this.disposers.push(()=>this.ambient.dispose());
     this.memories=new Memories(this.scene,data,this.obstacles,bus,memories);this.signatures=new Signatures(this.scene,data);
     const accents=gardenAccents(this.scene,data,this.obstacles,[...this.memories.entries,...this.artworks.map(a=>a.approach),...this.stations.map(s=>s.approach)]);this.disposers.push(accents.release);
     this.seasons.settleSnow(data,this.obstacles,[...this.memories.entries,...this.artworks.map(a=>a.approach),...this.stations.map(s=>s.approach)]);
@@ -171,7 +177,7 @@ export class World {
     window.addEventListener('keyup',e=>this.keys.delete(e.code),options);window.addEventListener('blur',()=>{this.keys.clear();this.touchSide=this.touchForward=0;this.jumpRequested=false;},options);
     document.addEventListener('visibilitychange',()=>{if(document.hidden){this.keys.clear();this.touchSide=this.touchForward=0;this.jumpRequested=false;this.look.release();}},options);
     if(new URLSearchParams(location.search).has('inspect')){
-      const inspect=()=>({benches:garden.benches,walls:garden.walls,snowDrifts:this.seasons.snowDrifts,accents:accents.entries,discoveries:wonderEntries,rails:garden.rails,resonance:this.resonance?.snapshot??null,traveler:this.traveler?.snapshot??null,whispers:this.whispers?.snapshot??null,signatures:this.signatures?.snapshot??[],harbor:{near:this.nearHarbor,...harbor},clouds:{canopyPosition:this.scene.getObjectByName('weather-cloud-canopy')?.position.toArray(),canopyOrder:this.scene.getObjectByName('weather-cloud-canopy')?.renderOrder,puffsOpaque:!((this.scene.getObjectByName('drifting-clouds') as T.Mesh).material as T.Material).transparent},nearArtwork:this.nearArtwork?.id??null,artworks:this.artworks.map(({module,...a})=>({...a,moduleId:module.id})),weather:this.environment.weatherState,snowmen:this.scene.getObjectsByProperty('name','snowman').length,player:{...this.player},camera:this.camera.position.toArray(),yaw:this.look.yaw,pitch:this.look.pitch,mode:this.mode,calls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hour:this.environment.hour,photo:this.photo.active,photoCamera:this.photo.camera.position.toArray(),gardenRoads:garden.roads,flowerCount:garden.flowerCount,flowerRoots:garden.flowerRoots,shortcuts:this.memories.shortcutPaths,obstacles:this.obstacles,memories:this.memories.entries.map(e=>({id:e.id,x:e.x,z:e.z})),trails:[...this.memories.trailPaths]});
+      const inspect=()=>({benches:garden.benches,walls:garden.walls,snowDrifts:this.seasons.snowDrifts,accents:accents.entries,discoveries:wonderEntries,rails:garden.rails,resonance:this.resonance?.snapshot??null,traveler:this.traveler?.snapshot??null,whispers:this.whispers?.snapshot??null,ambient:this.ambient.snapshot,signatures:this.signatures?.snapshot??[],harbor:{near:this.nearHarbor,...harbor,boatPosition:this.harborScene.boat.position.toArray(),boatScale:this.harborScene.boat.scale.x,boatYaw:this.harborScene.boat.rotation.y,tenderPosition:this.harborScene.tender.position.toArray(),tenderScale:this.harborScene.tender.scale.x},clouds:{canopyPosition:this.scene.getObjectByName('weather-cloud-canopy')?.position.toArray(),canopyOrder:this.scene.getObjectByName('weather-cloud-canopy')?.renderOrder,puffsOpaque:!((this.scene.getObjectByName('drifting-clouds') as T.Mesh).material as T.Material).transparent},nearArtwork:this.nearArtwork?.id??null,artworks:this.artworks.map(({module,...a})=>({...a,moduleId:module.id})),weather:this.environment.weatherState,snowmen:this.scene.getObjectsByProperty('name','snowman').length,player:{...this.player},camera:this.camera.position.toArray(),yaw:this.look.yaw,pitch:this.look.pitch,mode:this.mode,calls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hour:this.environment.hour,photo:this.photo.active,photoCamera:this.photo.camera.position.toArray(),gardenRoads:garden.roads,flowerCount:garden.flowerCount,flowerRoots:garden.flowerRoots,shortcuts:this.memories.shortcutPaths,obstacles:this.obstacles,memories:this.memories.entries.map(e=>({id:e.id,x:e.x,z:e.z})),trails:[...this.memories.trailPaths]});
       Object.assign(window,{__xiangmetaInspect:()=>({...inspect(),stations:this.stations.map(s=>({...s,hint:this.scene.getObjectByName(`station-${s.id}`)?.getObjectByName('solid-sign')?.userData.subtitle})),textures:textureStatus(),render:{pixelRatio:this.renderer.getPixelRatio(),shadowSize:renderSettings.shadowSize},foundations:this.scene.getObjectsByProperty('name','stratified-island').length}),
         // Review helpers: a framed still (photo camera) or a first-person arrival.
         __xiangmetaFrame:(p:[number,number,number],t:[number,number,number],hour?:number)=>{this.photoMode(true);const camera=this.camera.clone();camera.position.set(...p);camera.lookAt(...t);this.photo.enter(camera);if(hour!==undefined){this.environment.hour=hour;this.environment.update(0,true);}this.renderer.shadowMap.needsUpdate=true;},
@@ -309,6 +315,7 @@ export class World {
     // Sky, stars and cloud parting follow the eye that is actually drawing the frame.
     const camera=this.photo.active?this.photo.camera:this.mode==='map'?this.mapCamera:this.camera;
     this.environment.update(dt,this.photo.active,camera.position);this.signatures.update(motion,this.environment.hour,this.reduced.matches,this.player.x,this.player.z,worldFeatures.responsiveSignatures);
+    this.ambient.update(motion,this.reduced.matches,this.environment.hour);
     this.seasons.update(motion,this.reduced.matches);
     for(const [id,e] of this.extensions)if(e.scene?.update)try{e.scene.update(motion,this.environment.hour);}catch(error){console.warn(`Module animation ${id} stopped`,error);e.scene.update=undefined;}
     for(const [id,obj] of this.objects){const pulse=obj.getObjectByName('pulse');if(pulse){const value=this.parameters.get(id)??.5;pulse.scale.setScalar(.7+value*.35+Math.sin(this.time*(1+value*4))*.15);}}

@@ -279,12 +279,14 @@ export function paintedTree(parent:T.Object3D,x:number,z:number,scale=1,form:Tre
   const bark=form==='blossom'?kit.ink():kit.timber(),colors=foliage[form];
   const lean=(random()-.5)*.5,height=form==='pine'||form==='snowpine'?3.1:form==='willow'?2.3:2.6;
   const trunk=[new T.Vector3(0,0,0),new T.Vector3(lean*.3,height*.35,(random()-.5)*.25),new T.Vector3(-lean*.4,height*.7,(random()-.5)*.3),new T.Vector3(lean*.2,height,(random()-.5)*.2)];
+  const trunkCurve=new T.CatmullRomCurve3(trunk);
   place(g,limb(trunk,form==='willow'?.2:.15,.05),bark);
   place(g,new T.SphereGeometry(.24,8,5).scale(1,.35,1),bark,0,.04,0);
   const tiers:[number,number,number,number][]=[];
   if(form==='pine'||form==='snowpine'){
-    for(let i=0;i<4;i++){const h=height*(.48+i*.17),a=random()*Math.PI*2,reach=(.95-i*.17)*(.8+random()*.3);
-      const tip=new T.Vector3(Math.cos(a)*reach,h+.12,Math.sin(a)*reach);place(g,limb([new T.Vector3(trunk[2].x*.5,h-.15,0),new T.Vector3(tip.x*.6,h+.05,tip.z*.6),tip],.06,.025,5,5),bark);
+    for(let i=0;i<4;i++){const a=random()*Math.PI*2,reach=(.95-i*.17)*(.8+random()*.3);
+      const base=trunkCurve.getPointAt(.43+i*.15),tip=base.clone().add(new T.Vector3(Math.cos(a)*reach,.18,Math.sin(a)*reach));
+      place(g,limb([base,base.clone().lerp(tip,.58).add(new T.Vector3(0,.08,0)),tip],.06,.025,5,5),bark);
       tiers.push([tip.x,tip.y+.08,tip.z,(.95-i*.15)]);}
     tiers.push([trunk[3].x,height+.12,trunk[3].z,.62]);
     for(const [tx,ty,tz,r] of tiers){const t=place(g,canopy,leaf(colors[0]),tx,ty,tz);t.scale.set(r*1.15,r*.34,r*.95);t.rotation.y=random()*3;
@@ -299,7 +301,7 @@ export function paintedTree(parent:T.Object3D,x:number,z:number,scale=1,form:Tre
       place(g,limb(pts,.045,.012,7,3),strand).castShadow=i%4===0;}
   }else{
     const count=form==='maple'?7:form==='blossom'?6:6;
-    for(let i=0;i<2;i++){const a=random()*Math.PI*2+i*Math.PI,tip=new T.Vector3(Math.cos(a)*.75,height*.85+random()*.3,Math.sin(a)*.75);place(g,limb([trunk[1].clone().setY(height*.5),new T.Vector3(tip.x*.5,height*.72,tip.z*.5),tip],.07,.03,6,5),bark);tiers.push([tip.x,tip.y+.1,tip.z,.62]);}
+    for(let i=0;i<2;i++){const a=random()*Math.PI*2+i*Math.PI,base=trunkCurve.getPointAt(.46+i*.12),tip=base.clone().add(new T.Vector3(Math.cos(a)*.75,height*.3+random()*.18,Math.sin(a)*.75));place(g,limb([base,base.clone().lerp(tip,.55).add(new T.Vector3(0,.08,0)),tip],.07,.03,6,5),bark);tiers.push([tip.x,tip.y+.1,tip.z,.62]);}
     for(let i=0;i<count;i++){const a=i/count*Math.PI*2+random(),r=.45+random()*.4;tiers.push([Math.cos(a)*r+trunk[3].x,height+.05+random()*.5,Math.sin(a)*r+trunk[3].z,.5+random()*.25]);}
     tiers.push([trunk[3].x,height+.55,trunk[3].z,.62]);
     tiers.forEach(([tx,ty,tz,r],i)=>{const t=place(g,canopy,leaf(colors[i%colors.length]),tx,ty,tz);t.scale.set(r,r*(form==='blossom'?.62:.78),r);t.rotation.set(random(),random()*3,0);});

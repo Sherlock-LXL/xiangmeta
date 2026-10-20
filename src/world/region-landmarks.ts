@@ -50,9 +50,15 @@ function scienceLandmark(root:T.Group):Obstacle[]{
   place(globe,new T.TorusGeometry(.48,.04,6,32),bronze,0,.72).rotation.x=Math.PI/2;
   place(globe,new T.SphereGeometry(.42,24,16),kit.azurite(),0,.82);
   const meridian=place(globe,new T.TorusGeometry(.47,.025,6,32),kit.gold(),0,.82);meridian.rotation.y=.4;
-  // A doorway at the foot of the slot faces the island; lanterns stand inside the tower's footprint.
-  place(tower,new T.BoxGeometry(1,1.7,.1),kit.ink(),0,.3+.85,2.31);
-  place(tower,new T.BoxGeometry(1.3,.16,.14),stone,0,.3+1.78,2.34);
+  // A warm timber instrument door replaces the old ink-black recess.
+  place(tower,new T.BoxGeometry(1.26,1.86,.14),stone,0,1.2,2.31);
+  for(const side of [-1,1]){
+    place(tower,new T.BoxGeometry(.48,1.58,.08),kit.timberLight(),side*.255,1.16,2.42);
+    for(const y of [.68,1.16,1.64])place(tower,new T.BoxGeometry(.42,.035,.025),kit.gold(),side*.255,y,2.47).castShadow=false;
+    place(tower,new T.SphereGeometry(.035,8,6),bronze,side*.08,1.16,2.48).castShadow=false;
+  }
+  place(tower,new T.BoxGeometry(1.42,.16,.2),stone,0,2.09,2.36);
+  place(tower,new T.BoxGeometry(1.32,.12,.34),kit.marble(),0,.31,2.39);
   for(const x of [-1.1,1.1])lantern(tower,x,3.15,.8);
   return [{x:0,z:-10.8,radius:3.55,height:5.8}];
 }

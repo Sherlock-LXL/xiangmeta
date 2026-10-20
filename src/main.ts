@@ -32,15 +32,16 @@ const app=document.querySelector<HTMLDivElement>('#app')!;
 const touchExperience=document.documentElement.classList.contains('touch-experience');
 const escape=(value:unknown)=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 const icon=(name:string)=>({world:'◈',mountain:'△',science:'◌',museum:'▥',studio:'♫',guide:'✦',arrow:diagonalArrow,sound:'♪',map:'⌖',close:'×',star:'☆'}[name]??'◈');
-app.innerHTML='<div class="web-loading"><span class="loading-symbol" aria-hidden="true">象</span><h1>XiangMeta</h1><span class="loading-subtitle">山海册页 · 一卷正在展开的个人世界</span><p>正在读取项目与世界档案…</p><progress aria-label="读取世界档案"></progress></div>';
+app.innerHTML='<div class="web-loading" id="world-loading"><span class="loading-symbol xiang-logo" aria-hidden="true">想</span><h1>XiangMeta</h1><span class="loading-subtitle">山海册页 · 一卷正在展开的个人世界</span><p>正在读取项目与世界档案…</p><progress aria-label="读取世界档案"></progress></div>';
 async function boot(){
   const data=await catalog();const bus=new EventBus(),store=new VisitorStore(),audio=new AudioSystem(bus,data.audio,(text,playing)=>{
     const caption=document.querySelector<HTMLElement>('#music-caption');if(caption){caption.textContent='♫ '+text;caption.dataset.playing=String(playing);}
   });
   if(new URLSearchParams(location.search).has('inspect'))Object.assign(window,{__xiangmetaAudio:()=>audio.snapshot});
+  app.classList.add('world-booting');
   app.innerHTML=`
     <aside class="sidebar">
-      <a class="brand" href="#" aria-label="返回世界总览"><span class="brand-symbol" aria-hidden="true">象</span><span>XiangMeta<small>A PERSONAL UNIVERSE</small></span></a>
+      <a class="brand" href="#" aria-label="返回世界总览"><span class="brand-symbol xiang-logo" aria-hidden="true">想</span><span>XiangMeta<small>A PERSONAL UNIVERSE</small></span></a>
       <div class="side-caption">EXPLORATION <span>探索无界</span></div>
       <button class="nav-overview active" id="overview" aria-label="世界总览" title="世界总览">${navIcon('world')} <span>世界总览</span><span class="nav-end">⌘</span></button>
       <div class="nav-section-label">探索大陆</div>
@@ -67,7 +68,8 @@ async function boot(){
       <aside class="mini-atlas" id="mini-atlas" aria-label="世界迷你地图"><svg viewBox="-100 -100 200 200" role="img" aria-label="迷你地图"><circle class="atlas-sea" cx="0" cy="0" r="99"/>${data.regions.map(r=>`<g class="atlas-region" data-mini-region="${r.id}" style="--accent:${r.color};--pigment:${pigmentAccent(r.color)}" tabindex="0" role="button" aria-label="${escape(r.title)}"><circle cx="${r.position[0]}" cy="${r.position[1]}" r="${r.radius}"/><text x="${r.position[0]}" y="${r.position[1]+r.radius+6}">${escape(r.english)}</text></g>`).join('')}<circle class="atlas-hub" cx="0" cy="0" r="2.4"/><g id="atlas-player" transform="translate(0,0)"><circle r="2.8"/><circle class="atlas-pulse" r="4.4"/></g></svg></aside>
       <div class="toast" role="status" aria-live="polite" hidden></div>
     </main>
-    <dialog id="inspector" aria-labelledby="panel-title"><div id="panel-content"></div></dialog>`;
+    <dialog id="inspector" aria-labelledby="panel-title"><div id="panel-content"></div></dialog>
+    <div class="web-loading" id="world-loading"><span class="loading-symbol xiang-logo" aria-hidden="true">想</span><h1>XiangMeta</h1><span class="loading-subtitle">山海册页 · 一卷正在展开的个人世界</span><p id="load-label" role="status">正在构建群岛…</p><progress id="world-progress" max="100" value="0" aria-label="构建世界"></progress><small id="load-percent">0%</small><a href="${sitePath('projects/')}">浏览项目 →</a></div>`;
   const $=<T extends HTMLElement=HTMLElement>(selector:string)=>document.querySelector<T>(selector)!;
   const dialog=$<HTMLDialogElement>('#inspector');let world:World|undefined;let current:Exhibit|undefined;let abort:AbortController|undefined;
   $('.local-badge').innerHTML=`<a href="${sitePath('projects/')}">Projects ${diagonalArrow}</a>`;
@@ -227,12 +229,12 @@ async function boot(){
     const route=(q:string)=>{const answer=guide(q,data);$('#guide-results').innerHTML=`<p class="panel-description">${escape(answer.text)}</p>${answer.exhibits.map(m=>`<button class="collection-item" data-exhibit="${m.id}"><span><b>${escape(m.title)}</b><small>${escape(m.subtitle)}</small></span><span>${diagonalArrow}</span></button>`).join('')}`;wireExhibits();};
     $<HTMLFormElement>('#guide-form').onsubmit=e=>{e.preventDefault();route($<HTMLInputElement>('#guide-query').value);};wireExhibits();
   }
-  app.insertAdjacentHTML('beforeend',`<div class="web-loading" id="world-loading"><span class="loading-symbol" aria-hidden="true">象</span><h1>XiangMeta</h1><span class="loading-subtitle">山海册页 · 一卷正在展开的个人世界</span><p id="load-label" role="status">正在构建群岛…</p><progress id="world-progress" max="100" value="0" aria-label="构建世界"></progress><small id="load-percent">0%</small><a href="${sitePath('projects/')}">浏览项目 →</a></div>`);
   try{
     world=await World.create($('#world'),data,bus,store.discoveries,store.memories,(done,total,label)=>{
       const percent=Math.round(done/total*100);$<HTMLProgressElement>('#world-progress').value=percent;$('#load-percent').textContent=`${percent}%`;$('#load-label').textContent=`正在准备 · ${label}`;
     });
     $('#world-loading').remove();
+    app.classList.remove('world-booting');
     if(touchExperience){
       const joystick=$('#touch-joystick'),knob=$('.touch-joystick-knob');let joystickPointer:number|null=null;
       const moveJoystick=(event:PointerEvent)=>{
@@ -247,6 +249,7 @@ async function boot(){
     }
   }catch(error){
     $('#world-loading').remove();
+    app.classList.remove('world-booting');
     document.querySelector('#touch-controls')?.remove();
     $('#world').innerHTML=`<div class="render-error"><b>3D 渲染暂时不可用</b><p>请使用支持 WebGL2 的浏览器并开启硬件加速。</p><a href="${sitePath('projects/')}">继续浏览全部项目 →</a></div>`;console.error(error);
   }
@@ -309,4 +312,4 @@ async function boot(){
   window.addEventListener('pagehide',event=>{if(event.persisted){world?.setPaused(true);return;}cleanup();world?.dispose();audio.dispose();});
   window.addEventListener('pageshow',event=>{if(event.persisted)world?.setPaused(false);});
 }
-boot().catch(error=>{app.innerHTML=`<div class="web-loading"><h1>世界暂时未能加载</h1><p>${escape(error.message)}</p><div class="loading-actions"><button id="retry">重新加载</button><a href="${sitePath('projects/')}">View Projects →</a></div></div>`;document.querySelector<HTMLButtonElement>('#retry')!.onclick=()=>location.reload();});
+boot().catch(error=>{app.classList.remove('world-booting');app.innerHTML=`<div class="web-loading"><h1>世界暂时未能加载</h1><p>${escape(error.message)}</p><div class="loading-actions"><button id="retry">重新加载</button><a href="${sitePath('projects/')}">View Projects →</a></div></div>`;document.querySelector<HTMLButtonElement>('#retry')!.onclick=()=>location.reload();});

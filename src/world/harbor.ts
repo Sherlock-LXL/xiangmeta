@@ -35,31 +35,53 @@ export function buildHarbor(scene:T.Scene,obstacles:Obstacle[]){
  for(const x of [-2.9,2.9])for(const z of [23,27.6]){place(root,new T.CylinderGeometry(.12,.15,.3,10),kit.stone(),x,y+.15,z);place(root,new T.SphereGeometry(.13,10,6),kit.stone(),x,y+.33,z).scale.y=.6;}
  for(let i=0;i<3;i++){const coil=mesh(root,new T.TorusGeometry(.22-i*.05,.03,5,20),rope,-3.1,y+.04+i*.05,25.2);coil.rotation.x=Math.PI/2;}
  lantern(root,3.05,25.2,.62,y);obstacles.push({x:3.05,z:25.2,radius:.25,height:y+1.2});
- for(const z of [23,27.6]){const curve=new T.CatmullRomCurve3([new T.Vector3(2.9,y+.3,z),new T.Vector3(3.85,-5.2,z+.12),new T.Vector3(5.3,-4.82,z+.15)]);mesh(root,new T.TubeGeometry(curve,12,.018,5,false),rope).castShadow=false;}
  const release=batchStatic(root);
- // A moored junk rests at sea level, separate from the accessible pier.
- const boat=new T.Group();boat.name='harbor-launch';boat.position.set(5.65,-5.35,25.5);scene.add(boat);
- // An open-topped shell meets a matching oval deck; bow and stern sweep up as separate blocks.
- const hullWood=material('#4a3527',.82,.02,'wood'),cut=Math.acos(.6),hull=mesh(boat,new T.SphereGeometry(1,40,18,0,Math.PI*2,cut,Math.PI-cut),hullWood);hull.scale.set(1.25,.7,3.1);
- const outline=new T.Shape();outline.absellipse(0,0,1.03,2.51,0,Math.PI*2,false,0);
- const deck=mesh(boat,new T.ExtrudeGeometry(outline,{depth:.12,bevelEnabled:false,curveSegments:48}),wood,0,.42);deck.rotation.x=-Math.PI/2;deck.name='launch-oval-deck';
- const seam=material('#7d5c3e',.92,0,'wood');
- for(let z=-2.3;z<=2.3;z+=.28){const w=2.04*Math.sqrt(1-(z/2.51)**2);mesh(boat,new T.BoxGeometry(w,.006,.012),seam,0,.544,z);}
- const gunwale=mesh(boat,new T.TorusGeometry(1,.04,6,64),post,0,.55);gunwale.rotation.x=Math.PI/2;gunwale.scale.set(1.06,2.55,1);
- for(const s of [-1,1]){const end=mesh(boat,softBox(.9,.42,.7),hullWood,0,.7,s*2.45);end.rotation.x=-s*.32;}
- // Arched woven cabin (wupeng) of split bamboo: a half-cylinder along the hull, ribbed in timber.
- const mat=material('#c9a86a',.95,0,'wood');mat.side=T.DoubleSide;
- const cabin=mesh(boat,new T.CylinderGeometry(.82,.82,1.7,18,1,true,-Math.PI/2,Math.PI),mat,0,.54,-.35);cabin.rotation.x=-Math.PI/2;
- for(let i=0;i<5;i++)mesh(boat,new T.TorusGeometry(.83,.025,4,18,Math.PI),post,0,.54,-1.15+i*.4);
- // Mast with a battened junk sail in ochre; sail and battens share one rig frame trailing aft.
- mesh(boat,new T.CylinderGeometry(.045,.06,3.3,8),post,0,2.15,1.25);
- const rig=new T.Group();rig.position.set(0,1.45,1.25);rig.rotation.y=Math.PI/2-.35;boat.add(rig);
- const sail=new T.Shape();sail.moveTo(0,0);sail.lineTo(1.5,.05);sail.quadraticCurveTo(1.7,1.2,1.25,2.35);sail.lineTo(0,2.2);sail.closePath();
- const canvas=material('#b4623a',.95,0,'plaster');canvas.side=T.DoubleSide;
- const cloth=mesh(rig,new T.ShapeGeometry(sail,10),canvas,0,0,.07);cloth.castShadow=false;
- for(let i=0;i<6;i++){const h=.05+i*.44,w=i<3?1.5+i*.06:1.62-(i-2)*.12;mesh(rig,new T.BoxGeometry(w,.035,.035),post,w/2,h,.1);}
- // Sculling oar (yuloh) trails astern.
- const oar=mesh(boat,new T.BoxGeometry(.06,.05,2.2),post,.35,.75,-2.9);oar.rotation.x=-.45;
- const boatRelease=batchStatic(boat);let time=0;
- return {root,boat,update(dt:number){time+=dt;boat.position.y=-5.35+Math.sin(time*.7)*.055;boat.rotation.z=Math.sin(time*.55)*.018;},dispose(){release();boatRelease();}};
+ // A full-size double-masted junk and a small covered tender point out to sea.
+ const boat=new T.Group();boat.name='harbor-launch';boat.position.set(.65,-5.38,35);boat.scale.setScalar(1.18);scene.add(boat);
+ const hullWood=material('#654331',.82,.02,'wood'),hullDark=material('#352f2b',.9,.01,'wood'),trim=material('#a34d38',.86,.01,'wood'),seam=material('#8c6845',.92,0,'wood'),cut=Math.acos(.58);
+ const hull=mesh(boat,new T.SphereGeometry(1,48,20,0,Math.PI*2,cut,Math.PI-cut),hullWood);hull.scale.set(1.55,.78,3.7);
+ const lowerHull=mesh(boat,new T.SphereGeometry(1,40,16,0,Math.PI*2,cut+.18,Math.PI-cut-.36),hullDark,0,-.08);lowerHull.scale.set(1.42,.72,3.55);
+ const outline=new T.Shape();outline.absellipse(0,0,1.3,3.08,0,Math.PI*2,false,0);
+ const deck=mesh(boat,new T.ExtrudeGeometry(outline,{depth:.14,bevelEnabled:false,curveSegments:56}),wood,0,.48);deck.rotation.x=-Math.PI/2;deck.name='launch-oval-deck';
+ for(let z=-2.8;z<=2.8;z+=.3){const w=2.58*Math.sqrt(Math.max(0,1-(z/3.08)**2));mesh(boat,new T.BoxGeometry(w,.009,.018),seam,0,.626,z);}
+ const gunwale=mesh(boat,new T.TorusGeometry(1,.045,7,72),trim,0,.65);gunwale.rotation.x=Math.PI/2;gunwale.scale.set(1.34,3.16,1);
+ for(const side of [-1,1]){
+  for(const z of [-2.15,-1.35,-.55,.25,1.05,1.85])mesh(boat,new T.CylinderGeometry(.026,.032,.54,6),post,side*1.22,.9,z);
+  for(const h of [.8,1.13])mesh(boat,new T.BoxGeometry(.055,.045,4.55),h>.9?trim:post,side*1.22,h,-.12);
+ }
+ for(const s of [-1,1]){const end=mesh(boat,softBox(1.08,.62,.88),hullWood,0,.82,s*3.05);end.rotation.x=-s*.31;mesh(boat,new T.BoxGeometry(.96,.08,.5),trim,0,1.06,s*3.17).rotation.x=-s*.31;}
+ // A glazed stern cabin carries a shallow tiled roof.
+ mesh(boat,softBox(2.05,.92,1.28),kit.plaster(),0,1.11,-1.7);
+ for(const z of [-2.35,-1.05])for(const x of [-.66,0,.66])mesh(boat,new T.BoxGeometry(.5,.48,.028),kit.lattice(),x,1.18,z).castShadow=false;
+ roof(boat,{width:2.35,depth:1.55,height:.45,overhang:.28,lift:.17,thickness:.07,y:1.62,z:-1.7});
+ for(const x of [-.88,.88])lantern(boat,x,-2.25,.28,.78);
+ const sailCanvas=material('#b96843',.95,0,'plaster');sailCanvas.side=T.DoubleSide;
+ const sail=(z:number,height:number,width:number,lean:number,color:T.Material)=>{
+  mesh(boat,new T.CylinderGeometry(.043,.065,height+.6,8),post,0,.72+(height+.6)/2,z);
+  const rig=new T.Group();rig.position.set(0,1.05,z);rig.rotation.y=Math.PI/2+lean;boat.add(rig);
+  const shape=new T.Shape();shape.moveTo(0,0);shape.lineTo(width,.08);shape.quadraticCurveTo(width*1.08,height*.55,width*.82,height);shape.lineTo(0,height*.92);shape.closePath();
+  mesh(rig,new T.ShapeGeometry(shape,12),color,0,0,.07).castShadow=false;
+  for(let i=0;i<6;i++){const h=.06+i*height/5.5,w=width*(1-.03*i);mesh(rig,new T.BoxGeometry(w,.032,.032),post,w/2,h,.1);}
+ };
+ sail(.85,3,1.95,-.2,sailCanvas);sail(-.8,2.25,1.35,.18,material('#d2a65d',.96,0,'plaster'));
+ const oar=mesh(boat,new T.BoxGeometry(.07,.05,1.55),post,.65,.78,-3);oar.rotation.x=-.44;
+ const tender=new T.Group();tender.name='harbor-tender';tender.position.set(-3,-5.39,32.4);tender.scale.setScalar(1.08);scene.add(tender);
+ const tenderHull=mesh(tender,new T.SphereGeometry(1,28,12,0,Math.PI*2,Math.acos(.58),Math.PI-Math.acos(.58)),material('#78523b',.86,.01,'wood'));tenderHull.scale.set(.72,.42,1.75);
+ mesh(tender,new T.BoxGeometry(1.08,.1,2.65),kit.timberLight(),0,.31);
+ const awning=material('#d8c08b',.96,0,'wood');awning.side=T.DoubleSide;
+ const canopy=mesh(tender,new T.CylinderGeometry(.52,.52,1.35,14,1,true,0,Math.PI),awning,0,.44,-.15);canopy.rotation.x=-Math.PI/2;
+ for(const z of [-.78,-.42,-.06,.3])mesh(tender,new T.TorusGeometry(.53,.025,5,18,Math.PI),post,0,.44,z);
+ for(const side of [-1,1]){const o=mesh(tender,new T.BoxGeometry(.045,.035,1.8),post,side*.58,.42,.25);o.rotation.x=side*.12;}
+ mesh(tender,new T.BoxGeometry(.32,.07,.65),kit.timber(),0,.48,1.16);
+ boat.updateMatrixWorld(true);
+ for(const side of [-1,1]){
+  const end=boat.localToWorld(new T.Vector3(side*1.08,.72,-3));
+  const curve=new T.CatmullRomCurve3([new T.Vector3(side*2.9,y+.3,27.6),new T.Vector3(side*3.1,-5.08,29.4),end]);
+  mesh(root,new T.TubeGeometry(curve,12,.018,5,false),rope).castShadow=false;
+ }
+ tender.updateMatrixWorld(true);
+ const tenderEnd=tender.localToWorld(new T.Vector3(.45,.38,-1.25)),tenderLine=new T.CatmullRomCurve3([new T.Vector3(-2.9,y+.3,27.6),new T.Vector3(-3.35,-5.12,29.3),tenderEnd]);
+ mesh(root,new T.TubeGeometry(tenderLine,12,.018,5,false),rope).castShadow=false;
+ const boatRelease=batchStatic(boat),tenderRelease=batchStatic(tender);let time=0;
+ return {root,boat,tender,update(dt:number){time+=dt;boat.position.y=-5.38+Math.sin(time*.64)*.05;boat.rotation.z=Math.sin(time*.5)*.012;tender.position.y=-5.39+Math.sin(time*.78+.8)*.065;tender.rotation.z=Math.sin(time*.62+.5)*.022;},dispose(){release();boatRelease();tenderRelease();}};
 }
