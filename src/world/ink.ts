@@ -106,7 +106,9 @@ export class InkPipeline{
   }
   setSize(width:number,height:number,pixelRatio:number){
     const w=Math.max(1,Math.round(width*pixelRatio)),h=Math.max(1,Math.round(height*pixelRatio)),u=this.material.uniforms;
-    this.target.setSize(w,h);u.texel.value.set(1/w,1/h);u.aspect.value=width/Math.max(1,height);u.lineWidth.value=Math.max(1,pixelRatio*.85);
+    // Whole-texel offsets: depth is sampled nearest, so a fractional step (1.275 at pixel ratio 1.5) snaps to
+    // uneven neighbours and flat ground reads as folds, blotting floors with false ink.
+    this.target.setSize(w,h);u.texel.value.set(1/w,1/h);u.aspect.value=width/Math.max(1,height);u.lineWidth.value=Math.max(1,Math.round(pixelRatio*.85));
   }
   set quality(low:boolean){const samples=low?0:4;if(samples===this.samples)return;this.samples=samples;this.target.dispose();this.target.samples=samples;}
   render(scene:T.Scene,camera:T.PerspectiveCamera){
