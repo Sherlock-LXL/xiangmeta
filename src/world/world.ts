@@ -155,7 +155,7 @@ export class World {
     this.wonders=new Discoveries(this.scene,wonderEntries,this.obstacles,bus,found);this.disposers.push(()=>this.wonders.dispose());
     const garden=buildGardenRoutes(this.scene,data,this.obstacles);this.disposers.push(garden.release);
     this.seasons=new Seasons(this.scene,data,this.obstacles);this.disposers.push(()=>this.seasons.dispose());
-    this.ambient=new AmbientLife(this.scene);this.disposers.push(()=>this.ambient.dispose());
+    this.ambient=new AmbientLife(this.scene,data.regions);this.disposers.push(()=>this.ambient.dispose());
     this.memories=new Memories(this.scene,data,this.obstacles,bus,memories);this.signatures=new Signatures(this.scene,data);
     const accents=gardenAccents(this.scene,data,this.obstacles,[...this.memories.entries,...this.artworks.map(a=>a.approach),...this.stations.map(s=>s.approach)]);this.disposers.push(accents.release);
     this.seasons.settleSnow(data,this.obstacles,[...this.memories.entries,...this.artworks.map(a=>a.approach),...this.stations.map(s=>s.approach)]);
@@ -198,7 +198,7 @@ export class World {
     const ground=mesh(this.scene,new T.CircleGeometry(r,96),surface,x,0,z);ground.rotation.x=-Math.PI/2;ground.castShadow=false;ground.name='island-surface';
   }
   private label(text:string,position:T.Vector3,click:()=>void,style:string,id=''){
-    const element=document.createElement('button');element.className=`world-label ${style}`;element.textContent=text;element.onclick=click;this.host.append(element);this.labels.push({element,position,id});
+    const element=document.createElement('button');element.className=`world-label ${style}`;element.textContent=text;element.onclick=click;element.hidden=true;this.host.append(element);this.labels.push({element,position,id});
   }
   private loadAsset(group:T.Group,asset:NonNullable<Exhibit['visualAsset']>){
     new GLTFLoader().load(asset.src,gltf=>{if(this.disposed){this.disposeObject(gltf.scene);return;}
@@ -329,10 +329,22 @@ export class World {
     this.shadowTime+=dt;if(this.shadowTime>=renderSettings.shadowInterval){this.renderer.shadowMap.needsUpdate=true;this.shadowTime=0;}
     this.draw();
     this.labelTime+=dt;
-    if(!this.photo.active&&this.labelTime>=1/30){this.labelTime=0;for(const l of this.labels){
+    if(!this.photo.active&&this.labelTime>=1/30){this.labelTime=0;
+     const bounds=this.host.getBoundingClientRect();
+     const occupied=[...document.querySelectorAll<HTMLElement>('.world-heading,.mini-atlas,.view-badge,.world-bottom,.guide-card,.interaction-prompt,.toast,#trail-guide')]
+       .filter(el=>!el.hidden&&el.getClientRects().length).map(el=>el.getBoundingClientRect());
+     for(const l of [...this.labels].sort((a,b)=>a.position.distanceToSquared(camera.position)-b.position.distanceToSquared(camera.position))){
       this.projected.copy(l.position).project(camera);const v=this.projected;const distance=l.position.distanceTo(camera.position);
       const visible=v.z<1&&v.z>-1&&Math.abs(v.x)<1&&Math.abs(v.y)<1&&(this.mode==='map'||distance<17&&!l.element.classList.contains('region-label')&&!l.element.classList.contains('exhibit-label')&&!l.element.classList.contains('harbor-label'));
-      if(l.element.hidden===visible)l.element.hidden=!visible;if(visible)l.element.style.transform=`translate(-50%, -50%) translate(${((v.x*.5+.5)*this.width).toFixed(1)}px,${((-v.y*.5+.5)*this.height).toFixed(1)}px)`;
+      l.element.hidden=!visible;
+      if(visible){
+        const x=(v.x*.5+.5)*this.width,y=(-v.y*.5+.5)*this.height;
+        l.element.style.transform=`translate(-50%, -50%) translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`;
+        const w=l.element.offsetWidth,h=l.element.offsetHeight,left=bounds.left+x-w/2,top=bounds.top+y-h/2;
+        const rect=new DOMRect(left,top,w,h),overlaps=occupied.some(r=>rect.left<r.right+6&&rect.right>r.left-6&&rect.top<r.bottom+6&&rect.bottom>r.top-6);
+        l.element.hidden=overlaps||left<bounds.left+8||top<bounds.top+8||rect.right>bounds.right-8||rect.bottom>bounds.bottom-8;
+        if(!l.element.hidden)occupied.push(rect);
+      }
     }}
     this.statsTime+=dt;if(this.statsTime>.5){this.statsTime=0;this.host.dataset.drawCalls=String(this.renderer.info.render.calls);const hour=this.environment.hour;const clock=document.querySelector('#sky-clock');if(clock)clock.textContent=`${String(Math.floor(hour)).padStart(2,'0')}:${String(Math.floor(hour%1*60)).padStart(2,'0')}`;}
     if(!this.region)this.updateLocation();this.updateNearby();

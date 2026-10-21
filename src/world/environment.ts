@@ -13,8 +13,8 @@ float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=a*noise(p);p=p*2.03+17
 
 /** Each hour is a pair of washes: the silk sky and the mist it leaves on the water. */
 const palette={
-  day:{zenith:'#a6c0c6',horizon:'#ebe6d4',deep:'#5f95a0',shallow:'#9cc5b4',crest:'#f1f0e2',trough:'#3e6d7c'},
-  dusk:{zenith:'#8a8fab',horizon:'#f1c39a',deep:'#4d6b80',shallow:'#88a59a',crest:'#f8e2c6',trough:'#34465c'},
+  day:{zenith:'#91c9df',horizon:'#edf4e9',deep:'#65acb8',shallow:'#b0dbc9',crest:'#f8fcf0',trough:'#4d899f'},
+  dusk:{zenith:'#9ca7cc',horizon:'#f6cfb5',deep:'#648da2',shallow:'#a1c5ba',crest:'#fbe9cd',trough:'#465f80'},
   night:{zenith:'#121b30',horizon:'#2f3e57',deep:'#0c1828',shallow:'#1d3d47',crest:'#9fb4c4',trough:'#070d18'},
   storm:{zenith:'#8a969b',horizon:'#cfcdc0',deep:'#3d5a64',shallow:'#6c8f8a',crest:'#dfe3dc',trough:'#26404c'},
   snow:{zenith:'#c3cfd6',horizon:'#eceeea'}
@@ -187,9 +187,9 @@ export class Environment {
     this.sun.material.opacity=this.moon.material.opacity=1-weather.shade*.98;this.halo.material.opacity=1-weather.cover;
     const solar=T.MathUtils.smoothstep(state.altitude,-.04,.04);
     this.light.color.set('#b9c8ea').lerp(this.color.set('#fff1d8').lerp(new T.Color('#f2b08e'),twilight*.55),solar);
-    this.ambient.intensity=(.62+day*.62)*(1-weather.shade*.22);
-    this.ambient.color.set('#8193bd').lerp(this.color.set('#e3ecef'),day).lerp(new T.Color('#efc9b4'),twilight*.35);
-    this.ambient.groundColor.set('#3e4b5e').lerp(this.color.set('#ab9c7d'),day);
+    this.ambient.intensity=(.62+day*.76)*(1-weather.shade*.22);
+    this.ambient.color.set('#8193bd').lerp(this.color.set('#e9f5fa'),day).lerp(new T.Color('#efc9b4'),twilight*.35);
+    this.ambient.groundColor.set('#3e4b5e').lerp(this.color.set('#b2c5b3'),day);
     const sky=this.skyMaterial.uniforms;
     sky.zenith.value.copy(this.current.zenith);sky.horizon.value.copy(this.current.horizon);sky.time.value=this.elapsed;sky.night.value=1-day;
     sky.glow.value.set('#ffd9a8').lerp(this.color.set('#ff8a55'),twilight).multiplyScalar(this.sun.visible?(1-weather.shade)*(.35+twilight*.9):0);
