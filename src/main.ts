@@ -46,6 +46,7 @@ async function boot(){
       <a class="brand" href="#" aria-label="返回世界总览"><span class="brand-symbol xiang-logo" aria-hidden="true">${brandMark}</span><span>XiangMeta<small>A PERSONAL UNIVERSE</small></span></a>
       <div class="side-caption">EXPLORATION <span>探索无界</span></div>
       <button class="nav-overview active" id="overview" aria-label="世界总览" title="世界总览">${navIcon('world')} <span>世界总览</span><span class="nav-end">⌘</span></button>
+      <button class="secondary-nav" id="seasonal-games" aria-label="四季游乐" title="四季游乐">${navIcon('world')} <span>四季游乐</span><b>4</b></button>
       <div class="nav-section-label">探索大陆</div>
       <nav id="regions">${data.regions.map((r,i)=>`<button class="region-nav" data-region="${r.id}" aria-label="${escape(r.title)}" title="${escape(r.title)}" style="--accent:${r.color};--pigment:${pigmentAccent(r.color)}">${navIcon(['mountain','science','museum','studio'][i])}<span>${escape(r.title)}<small>${escape(r.english)}</small></span><span class="nav-end">${diagonalArrow}</span></button>`).join('')}</nav>
       <div class="side-divider"></div>
@@ -223,7 +224,7 @@ async function boot(){
   bus.on('photo',active=>{document.body.classList.toggle('photo-mode',active);$('#photo-toolbar').hidden=!active;$<HTMLInputElement>('#photo-fov').value='60';$<HTMLSelectElement>('#photo-hour').value='';$('#photo-status').textContent='';});
   $<HTMLInputElement>('#photo-fov').oninput=e=>world?.photoFov(Number((e.target as HTMLInputElement).value));$<HTMLSelectElement>('#photo-hour').onchange=e=>{const value=(e.target as HTMLSelectElement).value;if(value)world?.setTime(Number(value));};
   const capturePhoto=async(postcard:boolean)=>{try{await world?.photograph(postcard);$('#photo-status').textContent=postcard?'明信片已导出':'照片已导出';}catch{$('#photo-status').textContent='导出失败，请重试';}};$('#photo-save').onclick=()=>void capturePhoto(false);$('#postcard-save').onclick=()=>void capturePhoto(true);
-  window.addEventListener('keydown',e=>{if(dialog.open)return;if(world?.isPhoto&&(e.code==='Escape'||e.code==='KeyP'&&!e.repeat)){e.preventDefault();exitPhoto();return;}if(e.target instanceof Element&&e.target.closest('textarea,input,select'))return;if(e.code==='KeyP'&&!e.repeat){e.preventDefault();enterPhoto();}});
+  window.addEventListener('keydown',e=>{if(dialog.open||world?.isPlayingGames)return;if(world?.isPhoto&&(e.code==='Escape'||e.code==='KeyP'&&!e.repeat)){e.preventDefault();exitPhoto();return;}if(e.target instanceof Element&&e.target.closest('textarea,input,select'))return;if(e.code==='KeyP'&&!e.repeat){e.preventDefault();enterPhoto();}});
 
   function showGuide(){
     const chat=data.modules.find(m=>m.id===data.agents[0]?.chatModule);
@@ -287,12 +288,13 @@ async function boot(){
   $('#overview').onclick=overview;$('#camera-reset').onclick=()=>world?.resumeWalk();$('#capture-look').onclick=()=>world?.captureMouse();$('.brand').onclick=e=>{e.preventDefault();overview();};
   document.querySelectorAll<HTMLButtonElement>('.region-nav').forEach(b=>b.onclick=()=>b.dataset.region&&world?.focusRegion(b.dataset.region));
   $('#collections').onclick=()=>collection();$('#favorites').onclick=()=>collection(true);$('#guide').onclick=showGuide;document.addEventListener('open-guide',showGuide);
+  $('#seasonal-games').onclick=()=>{document.body.classList.remove('mobile-nav-open');document.querySelector('#mobile-menu')?.setAttribute('aria-expanded','false');if(dialog.open)closePanel(false);world?.openGames();};
   store.muted=true;
   const soundLabel=()=>{const text=store.muted?'开启音乐与音效':'暂停音乐与音效';$('#sound').classList.toggle('enabled',!store.muted);$('#sound').setAttribute('aria-label',text);$('#sound').setAttribute('aria-pressed',String(!store.muted));$('#sound').title=text;};
   $('#sound').onclick=async()=>{store.muted=!store.muted;soundLabel();try{await audio.setMuted(store.muted);store.save();toast(store.muted?'音乐与音效已暂停':'BGM、四季音乐与风铃已开启');}catch{store.muted=true;soundLabel();toast('音乐暂时不可用，请点击 ♪ 重试');}};
   soundLabel();
   const helpControls=touchExperience?'<p>拖动左下摇杆：控制行走方向与速度</p><p>在世界画面上拖动：环顾四周；右下「跳跃」越过台阶</p><p>移动与环顾支持双指同时操作，两个触点互不干扰</p><p>靠近展台后，直接点击浮窗中的 GitHub、简介、Demo 或展览按钮</p><p>左上菜单：切换区域、打开世界总览、项目索引、记忆与摄影工具</p>':'<p><kbd>W A S D</kbd> 或方向键：行走；Shift 加速；Space 跳跃</p><p>点击画布或「进入环顾」：鼠标环顾；也可以按住拖动</p><p><kbd>F</kbd>：打开项目 GitHub；没有仓库链接时打开展览；作品前查看作品，港口查看航线</p><p><kbd>E</kbd>：查看项目简介、技术栈、结果与资料</p><p><kbd>R</kbd>：打开 Demo / 音乐 / MV，仅有链接的项目显示</p><p><kbd>G</kbd>：收集记忆或体验趣味装置</p><p><kbd>P</kbd>：摄影模式；WASD 平移，Q / E 升降，导出明信片</p><p>左侧区域导航：传送；「世界总览」：拖动旋转与滚轮缩放</p><p><kbd>Esc</kbd>：释放鼠标或关闭面板；关闭后可继续探索</p>';
-  $('#help').onclick=()=>{showPanel(panelHeader('FIELD NOTES','以自己的视角，走进世界')+`<div class="help-grid">${helpControls}<p><kbd>Q</kbd>：拿起／放下四季小物，靠近动物时抚摸；触屏直接点浮窗按钮</p><p><kbd>T</kbd>：骑上梅花鹿或北极熊／下来；岛内移动速度 ×1.45，跳跃更高</p><p>绿圈表示可以放下物品；避开门口、岸边与斜坡。动物会休息、散步和偶尔好奇地看你。</p></div><label class="quality-option"><input type="checkbox" id="low-quality"/> 降低渲染质量，适配低性能设备</label><p class="source-note">科研模拟按论文方程计算，默认值是演示参数。个人音乐和 MV 在外部平台打开。</p>`);$<HTMLInputElement>('#low-quality').checked=world?.isLowQuality??false;$<HTMLInputElement>('#low-quality').onchange=e=>world?.quality((e.target as HTMLInputElement).checked);};
+  $('#help').onclick=()=>{showPanel(panelHeader('FIELD NOTES','以自己的视角，走进世界')+`<div class="help-grid">${helpControls}<p><kbd>Q</kbd>：拿起／放下四季小物，靠近动物时抚摸；触屏直接点浮窗按钮</p><p><kbd>T</kbd>：骑上梅花鹿或北极熊／下来；移动速度 ×1.45，可沿桥梁跨岛，跳跃更高</p><p><kbd>V</kbd>：靠近游乐摊位开始游戏；侧栏“四季游乐”也可进入。驾驶时 P 暂停、R 复位，触屏使用屏幕按钮。</p><p>绿圈表示可以放下物品；避开门口、岸边与斜坡。动物会休息、散步和偶尔好奇地看你。</p></div><label class="quality-option"><input type="checkbox" id="low-quality"/> 降低渲染质量，适配低性能设备</label><p class="source-note">科研模拟按论文方程计算，默认值是演示参数。个人音乐和 MV 在外部平台打开。</p>`);$<HTMLInputElement>('#low-quality').checked=world?.isLowQuality??false;$<HTMLInputElement>('#low-quality').onchange=e=>world?.quality((e.target as HTMLInputElement).checked);};
   const openExternal=(url:string)=>{if(document.pointerLockElement)document.exitPointerLock();window.open(url,'_blank','noopener,noreferrer');};
   bus.on('select',m=>openExhibit(m));bus.on('interact',m=>{const {github}=projectLinks(m);if(github)openExternal(github);else openExhibit(m,true);});
   bus.on('demo',m=>{const {demo}=projectLinks(m);if(demo)openExternal(demo);});

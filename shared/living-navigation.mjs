@@ -1,5 +1,6 @@
 import {groundHeight} from './terrain-height.mjs';
-import {overlaps,pointSegmentDistance} from './navigation.mjs';
+import {overlaps,pointSegmentDistance,supportedFootprint} from './navigation.mjs';
+import {STEP_HEIGHT} from './locomotion.mjs';
 import {footprintBounds} from './decoration-clearance.mjs';
 
 /** A local broad phase around the existing world colliders; never changes the original map. */
@@ -22,18 +23,27 @@ export class LivingNavigation{
   regionAt(x,z,radius=0){return this.regions.find(r=>Math.hypot(x-r.position[0],z-r.position[1])<r.radius-.9-radius);}
   /** Animals can negotiate slopes and small terrace lips; loose objects still need flat support. */
   travel(x,z,radius,regionId,dynamic=[]){
-    return this.ground(x,z,radius,regionId,dynamic,false,.24+radius*.65);
+    if(regionId&&this.regionAt(x,z,radius)?.id!==regionId)return null;
+    if(!supportedFootprint(x,z,this.regions,radius))return null;
+    let y=groundHeight(x,z,this.regions);
+    for(const o of this.nearby(x,z,radius+.12)){
+      if(!overlaps(x,z,o,radius+.1))continue;
+      const h=o.height??Infinity;if(h-y>STEP_HEIGHT)return null;y=Math.max(y,h);
+    }
+    if(dynamic.some(o=>Math.hypot(x-o.x,z-o.z)<radius+o.radius+.12))return null;
+    return y;
   }
   route(a,b,radius,regionId,dynamic=[]){
     const n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/.12));
     let previous=this.travel(a.x,a.z,radius,regionId);
     for(let i=1;i<=n;i++){
       const t=i/n,y=this.travel(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t,radius,regionId,dynamic);
-      if(y===null||previous!==null&&Math.abs(y-previous)>.22)return false;previous=y;
+      if(y===null||previous!==null&&Math.abs(y-previous)>STEP_HEIGHT)return false;previous=y;
     }
     return true;
   }
-  /** Flat support for the whole footprint, away from rails, trees, exhibits and open shore. */
+  /** Flat support for the whole footprint, away from rails, trees, exhibits and open shore.
+   * @param {string|null} regionId */
   ground(x,z,radius,regionId=null,dynamic=[],reserve=false,spread=.06){
     const region=this.regionAt(x,z,radius);
     if(regionId?region?.id!==regionId:!region&&Math.hypot(x,z)>8-radius)return null;

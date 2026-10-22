@@ -3,7 +3,7 @@ import {animalSpecies,seasonalObjects,seededRandom,turnToward} from '../../share
 import {LivingNavigation} from '../../shared/living-navigation.mjs';
 import {createAnimalState,updateAnimal,petAnimal,animalCollider} from '../../shared/animal-behavior.mjs';
 import {groundHeight} from '../../shared/terrain-height.mjs';
-import {overlaps} from '../../shared/navigation.mjs';
+import {overlaps,supportedFootprint,bodyFootprint} from '../../shared/navigation.mjs';
 import {seasonalModel} from './living-models';
 import {animalModel} from './animal-models';
 import {batchStatic} from './optimizer';
@@ -54,6 +54,8 @@ export class LivingWorld{
     this.ghost.rotation.x=-Math.PI/2;this.ghost.visible=false;this.root.add(this.ghost);
   }
   get ride(){return this.mounted?.state??null;}
+  get rideRadius(){return (this.mounted?.state.bodyRadius??.35)+.09;}
+  get rideFootprint(){const a=this.mounted?.state;return a?bodyFootprint(a.yaw,a.bodyLength+.1):[{x:0,z:0}];}
   get carrying(){return !!this.carried;}
   get focused(){return this.available&&!!(this.candidate||this.carried||this.mounted);}
   private occupied(except?:Item|Animal){
@@ -65,12 +67,14 @@ export class LivingWorld{
       ...this.animals.filter(a=>a!==this.mounted).map(a=>animalCollider(a.state))];
   }
   canRide(x:number,z:number){
-    const a=this.mounted?.state;return !a||this.nav.travel(x,z,a.radius,a.regionId)!==null;
+    return !this.mounted||supportedFootprint(x,z,this.nav.regions,this.rideRadius,this.rideFootprint);
   }
   steerRide(velocity:T.Vector3,dt:number){
     const a=this.mounted?.state,speed=velocity.length();if(!a||speed<.001)return;
     const desired=Math.atan2(velocity.x,velocity.z);
-    a.yaw=turnToward(a.yaw,desired,dt*5.8);
+    const yaw=turnToward(a.yaw,desired,dt*5.8),footprint=bodyFootprint(yaw,a.bodyLength+.1);
+    if(supportedFootprint(a.x,a.z,this.nav.regions,this.rideRadius,footprint)&&
+      ![...this.nav.nearby(a.x,a.z,a.radius)].some(o=>(o.height??Infinity)>a.y+.55&&footprint.some(p=>overlaps(a.x+p.x,a.z+p.z,o,this.rideRadius))))a.yaw=yaw;
   }
   private message(text:string){this.bus.emit('livingMessage',text);}
   interact(key:'Q'|'T',player:Player,yaw:number){
@@ -87,9 +91,9 @@ export class LivingWorld{
     if('rig' in target){
       const a=target.state;
       if(key==='Q'&&petAnimal(a)){this.message(a.kind==='heron'||a.kind==='penguin'?`${a.name}轻轻抖了抖羽毛`:`${a.name}开心地回应了你`);this.bus.emit('sound','interaction');}
-      else if(key==='T'&&a.ride&&this.nav.travel(a.x,a.z,a.radius,a.regionId)!==null){
+      else if(key==='T'&&a.ride&&supportedFootprint(a.x,a.z,this.nav.regions,a.bodyRadius+.09,bodyFootprint(a.yaw,a.bodyLength+.1))){
         a.mode='ridden';a.target=null;this.mounted=target;player.x=a.x;player.y=a.y;player.z=a.z;player.vy=0;
-        this.message(`骑上${a.name} · 岛内快跑与高跳 · T 下来`);
+        this.message(`骑上${a.name} · 沿桥梁自由探索群岛 · T 下来`);
       }
     }else if(key==='Q'){this.carried=target;this.message(`拿起了${target.name} · Q 放在绿圈处`);}
     this.candidate=null;
@@ -99,15 +103,19 @@ export class LivingWorld{
     const a=animal.state,dynamic=[...this.occupied(),{x:a.x,z:a.z,radius:a.radius}];
     for(let ring=0;ring<6;ring++)for(let i=0;i<24;i++){
       const angle=a.yaw+Math.PI/2+i*Math.PI/12,r=a.radius+.52+ring*.25,x=a.x+Math.sin(angle)*r,z=a.z+Math.cos(angle)*r;
-      const y=this.nav.travel(x,z,.36,a.regionId,dynamic);
+      const y=this.nav.travel(x,z,.36,null,dynamic);
       if(y===null||!this.nav.sight({x:a.x,y:a.y+.6,z:a.z},{x,y:y+.6,z}))continue;
-      player.x=x;player.y=y;player.z=z;player.vy=0;player.grounded=true;a.mode='watch';a.timer=2;a.home={x:a.x,y:a.y,z:a.z};this.mounted=null;this.message('轻轻落地');return;
+      player.x=x;player.y=y;player.z=z;player.vy=0;player.grounded=true;a.mode='watch';a.timer=2;a.home={x:a.x,y:a.y,z:a.z};a.regionId=this.nav.regionAt(a.x,a.z,a.radius)?.id??null;this.mounted=null;this.message('轻轻落地');return;
     }
     this.message('身边有障碍，骑到开阔处再下来');
   }
-  /** Keep objects in hand during fast travel; leave a mount safely on its island. */
+  /** Keep objects in hand during fast travel; settle a mount on its current support. */
   beforeTeleport(){
-    if(this.mounted){const a=this.mounted.state;a.y=groundHeight(a.x,a.z,this.nav.regions);a.mode='rest';a.timer=3;a.home={x:a.x,y:a.y,z:a.z};this.mounted=null;}
+    if(this.mounted){
+      const a=this.mounted.state,footprint=this.rideFootprint;a.y=groundHeight(a.x,a.z,this.nav.regions);
+      for(const o of this.nav.nearby(a.x,a.z,a.radius))if((o.height??Infinity)<=a.y+.55&&footprint.some(p=>overlaps(a.x+p.x,a.z+p.z,o,this.rideRadius)))a.y=Math.max(a.y,o.height??a.y);
+      a.mode='rest';a.timer=3;a.home={x:a.x,y:a.y,z:a.z};a.regionId=this.nav.regionAt(a.x,a.z,a.radius)?.id??null;this.mounted=null;
+    }
     this.candidate=null;this.drop=null;this.ghost.visible=false;
   }
   update(dt:number,player:Player,camera:T.PerspectiveCamera,yaw:number,available:boolean,reduced:boolean){
@@ -115,6 +123,7 @@ export class LivingWorld{
     for(const a of this.animals){
       if(a===this.mounted){
         a.state.x=player.x;a.state.y=player.y;a.state.z=player.z;
+        a.state.regionId=this.nav.regionAt(player.x,player.z)?.id??null;
         a.state.walkPhase+=Math.min(2.8,speed/(a.state.stride??1))*dt*Math.PI*2;a.state.velocity=speed;
         a.state.expression+=dt;
         a.state.headYaw=turnToward(a.state.headYaw,0,dt);

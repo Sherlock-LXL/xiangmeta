@@ -2,11 +2,11 @@ import { onGround,overlaps } from './navigation.mjs';
 import {groundHeight} from './terrain-height.mjs';
 export const GRAVITY=22;
 export const JUMP_SPEED=8;
-export const STEP_HEIGHT=.22;
+export const STEP_HEIGHT=.48;
 export function createWalker(x=0,z=0,regions=[]){return {x,y:groundHeight(x,z,regions),z,vy:0,grounded:true};}
-function topAt(x,z,obstacles,regions,radius=.35){
+function topAt(x,z,obstacles,regions,radius=.35,footprint=[{x:0,z:0}]){
   let top=groundHeight(x,z,regions);
-  for(const obstacle of obstacles)if(overlaps(x,z,obstacle,radius))top=Math.max(top,obstacle.height??Infinity);
+  for(const obstacle of obstacles)if(footprint.some(p=>overlaps(x+p.x,z+p.z,obstacle,radius)))top=Math.max(top,obstacle.height??Infinity);
   return top;
 }
 /** Living bodies have sides, never an infinite floor. Resolve contact along the surface,
@@ -29,10 +29,11 @@ export function separateBodies(point,bodies,radius=.35){
 /** Feet position, swept vertical landing, and short collision substeps. No renderer dependency. */
 export function advanceWalker(state,input,dt,regions,obstacles,options={}){
   const bodies=obstacles.filter(o=>o.dynamic),solid=obstacles.filter(o=>!o.dynamic),radius=options.radius??.35;
-  const top=(x,z)=>topAt(x,z,solid,regions,radius);
+  const footprint=options.footprint??[{x:0,z:0}],stepHeight=options.stepHeight??STEP_HEIGHT;
+  const top=(x,z)=>topAt(x,z,solid,regions,radius,footprint);
   const clear=(x,z)=>onGround(x,z,regions)&&(!options.canEnter||options.canEnter(x,z))&&
     state.y>=groundHeight(x,z,regions)-.001&&
-    !solid.some(o=>overlaps(x,z,o,radius)&&state.y<(o.height??Infinity)-.001);
+    !solid.some(o=>footprint.some(p=>overlaps(x+p.x,z+p.z,o,radius))&&state.y<(o.height??Infinity)-.001);
   if(input.jump&&state.grounded){state.vy=options.jumpSpeed??JUMP_SPEED;state.grounded=false;}
   const steps=Math.max(1,Math.ceil(Math.min(.1,Math.max(0,dt))/(1/120))),h=Math.min(.1,Math.max(0,dt))/steps;
   for(let i=0;i<steps;i++){
@@ -46,7 +47,7 @@ export function advanceWalker(state,input,dt,regions,obstacles,options={}){
       if(!onGround(x,z,regions))continue;
       if(options.canEnter&&!options.canEnter(x,z))continue;
       const floor=top(x,z);
-      if(state.grounded&&Math.abs(floor-state.y)<=STEP_HEIGHT){state.y=floor;state[axis]=axis==='x'?x:z;}
+      if(state.grounded&&Math.abs(floor-state.y)<=stepHeight){state.y=floor;state[axis]=axis==='x'?x:z;}
       else if(clear(x,z))state[axis]=axis==='x'?x:z;
     }
     const separated=separateBodies(state,bodies,radius);

@@ -99,7 +99,11 @@ function restCorner(g:T.Group,x:number,flowers:FlowerPoint[]){
 export function dressRegion(region:Region,exhibits:Exhibit[],obstacles:Obstacle[]){
   const g=new T.Group();const [rx,rz]=region.position;g.position.set(rx,0,rz);
   const gardenFlowers:FlowerPoint[]=[];
-  const block=(x:number,z:number,radius:number,height=Infinity)=>obstacles.push({x:rx+x,z:rz+z,radius,height});
+  // Ground-only props used to have infinitely tall blockers. Match their sculpted bounds
+  // so flight can pass above trees, lanterns and entrance arches.
+  const block=(x:number,z:number,radius:number,height?:number)=>obstacles.push({
+    x:rx+x,z:rz+z,radius,height:height??new T.Box3().setFromObject(g.children.at(-1)!).max.y,
+  });
   const onPath=(x:number,z:number,margin=0)=>onRegionRoute(x,z,region,exhibits,margin);
   const nearDiscovery=(x:number,z:number)=>!!region.discovery&&Math.hypot(x-region.discovery.position[0],z-region.discovery.position[1])<3.1;
   if(region.season!=='winter'&&!onPath(-5,11,1.5)){flowerBed(g,region.color);block(-5,11,1.25,.85);}
@@ -114,7 +118,7 @@ export function dressRegion(region:Region,exhibits:Exhibit[],obstacles:Obstacle[
     const distance=Math.hypot(rx,rz),gx=-rx/distance*(region.radius-2),gz=-rz/distance*(region.radius-2),rotation=Math.atan2(-rx,-rz);
     const arch=paifang(g,6.2,4.2,{x:gx,z:gz,rotation,tiles:region.season==='winter'?kit.tileSnow():kit.tile()});
     const entrance=sign(arch.group,region.title,region.scenery==='laboratory'?'观察 · 建模 · 探索':'',region.color,3,.62);entrance.position.set(0,arch.plaqueY,0);
-    for(const x of [-3.1,3.1])for(const z of [0,-.58,.58]){const p=new T.Vector3(x,0,z).applyAxisAngle(new T.Vector3(0,1,0),rotation).add(new T.Vector3(gx,0,gz));block(p.x,p.z,z?.26:.3,z?1:Infinity);}
+    for(const x of [-3.1,3.1])for(const z of [0,-.58,.58]){const p=new T.Vector3(x,0,z).applyAxisAngle(new T.Vector3(0,1,0),rotation).add(new T.Vector3(gx,0,gz));block(p.x,p.z,z?.26:.3,z?1:undefined);}
   }
   const fence=region.season==='winter'?'stone':region.season==='summer'?'bamboo':'timber';
   // Perimeter planting, lanterns and fence runs leave the radial bridges open.
