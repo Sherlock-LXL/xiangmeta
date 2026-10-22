@@ -232,3 +232,6 @@ textarea,input:not([type=range]):not([type=checkbox]):not([type=file]),select{ba
   html.touch-experience .toast{top:72px;left:160px;right:116px}
   html.touch-experience #trail-guide{top:128px;left:160px;right:116px}
 }
+.brand-symbol.xiang-logo{width:44px;height:44px;background:transparent;box-shadow:none;border:0;transform:none;overflow:visible}
+.web-loading .loading-symbol.xiang-logo{background:transparent;box-shadow:none;transform:none}
+#interaction-prompt .nearby-actions button:disabled{opacity:.5;cursor:default}

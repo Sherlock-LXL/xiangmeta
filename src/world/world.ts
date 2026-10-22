@@ -43,6 +43,7 @@ import {nearbyActions,actionHint,type InteractionKey} from '../core/nearby-actio
 import type { Catalog,Exhibit,ArtworkInteraction } from '../core/types';
 import type { EventBus } from '../core/events';
 import {AmbientLife} from './ambient-life';
+import {LivingWorld} from './living-world';
 type Station={id:string;x:number;z:number;approach:{x:number;z:number}};
 export class World {
   private scene=new T.Scene();private camera=new T.PerspectiveCamera(68,1,.08,900);
@@ -62,6 +63,7 @@ export class World {
   private wonders!:Discoveries;
   private traveler?:TravelerEffects;private resonance?:WorldResonance;private whispers?:WorldWhispers;private hubMotion=(dt:number)=>{void dt;};
   private ambient!:AmbientLife;
+  private living!:LivingWorld;
   private seasons!:Seasons;
   private memories!:Memories;private signatures!:Signatures;private photo!:PhotoCamera;private photoTime={hour:9,cycling:true};private reduced=matchMedia('(prefers-reduced-motion: reduce)');
   private extensions=new Map<string,ReturnType<typeof moduleExtensions>>();
@@ -159,6 +161,13 @@ export class World {
     this.memories=new Memories(this.scene,data,this.obstacles,bus,memories);this.signatures=new Signatures(this.scene,data);
     const accents=gardenAccents(this.scene,data,this.obstacles,[...this.memories.entries,...this.artworks.map(a=>a.approach),...this.stations.map(s=>s.approach)]);this.disposers.push(accents.release);
     this.seasons.settleSnow(data,this.obstacles,[...this.memories.entries,...this.artworks.map(a=>a.approach),...this.stations.map(s=>s.approach)]);
+    const reserved=[...this.memories.entries,...this.artworks.map(a=>a.approach),...this.stations.map(s=>s.approach),...wonderEntries].map(p=>({x:p.x,z:p.z,radius:1.7}));
+    for(const r of data.regions){
+      reserved.push({x:r.position[0]+(r.spawn?.[0]??0),z:r.position[1]+(r.spawn?.[1]??10),radius:2});
+      const d=Math.hypot(...r.position);
+      for(let t=0;t<r.radius;t+=1.5)reserved.push({x:r.position[0]*(1-t/d),z:r.position[1]*(1-t/d),radius:1.25});
+    }
+    this.living=new LivingWorld(this.scene,data,this.obstacles,reserved,bus);this.disposers.push(()=>this.living.dispose());
     yield '步道、记忆与四季';
     this.environment.collectLights();this.renderer.shadowMap.needsUpdate=true;
     this.disposers.push(bus.on('interact',m=>this.runHook(m.id,'onInteract')));
@@ -172,13 +181,14 @@ export class World {
       this.keys.add(event.code);
       if(['KeyF','KeyE','KeyR'].includes(event.code)&&!event.repeat&&this.mode==='first-person'){event.preventDefault();this.interactExhibit(event.code.slice(3) as InteractionKey);}
       if(event.code==='KeyG'&&!event.repeat){event.preventDefault();this.interactDiscovery();}
+      if(['KeyQ','KeyT'].includes(event.code)&&!event.repeat&&this.mode==='first-person'){event.preventDefault();this.interactLiving(event.code==='KeyQ'?'Q':'T');}
       if(event.code==='Space'&&!event.repeat&&this.mode==='first-person')this.jumpRequested=true;
     },options);
     window.addEventListener('keyup',e=>this.keys.delete(e.code),options);window.addEventListener('blur',()=>{this.keys.clear();this.touchSide=this.touchForward=0;this.jumpRequested=false;},options);
     document.addEventListener('visibilitychange',()=>{if(document.hidden){this.keys.clear();this.touchSide=this.touchForward=0;this.jumpRequested=false;this.look.release();}},options);
     if(new URLSearchParams(location.search).has('inspect')){
       const inspect=()=>({benches:garden.benches,walls:garden.walls,snowDrifts:this.seasons.snowDrifts,accents:accents.entries,discoveries:wonderEntries,rails:garden.rails,resonance:this.resonance?.snapshot??null,traveler:this.traveler?.snapshot??null,whispers:this.whispers?.snapshot??null,ambient:this.ambient.snapshot,signatures:this.signatures?.snapshot??[],harbor:{near:this.nearHarbor,...harbor,boatPosition:this.harborScene.boat.position.toArray(),boatScale:this.harborScene.boat.scale.x,boatYaw:this.harborScene.boat.rotation.y,tenderPosition:this.harborScene.tender.position.toArray(),tenderScale:this.harborScene.tender.scale.x},clouds:{canopyPosition:this.scene.getObjectByName('weather-cloud-canopy')?.position.toArray(),canopyOrder:this.scene.getObjectByName('weather-cloud-canopy')?.renderOrder,puffsOpaque:!((this.scene.getObjectByName('drifting-clouds') as T.Mesh).material as T.Material).transparent},nearArtwork:this.nearArtwork?.id??null,artworks:this.artworks.map(({module,...a})=>({...a,moduleId:module.id})),weather:this.environment.weatherState,snowmen:this.scene.getObjectsByProperty('name','snowman').length,player:{...this.player},camera:this.camera.position.toArray(),yaw:this.look.yaw,pitch:this.look.pitch,mode:this.mode,calls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hour:this.environment.hour,photo:this.photo.active,photoCamera:this.photo.camera.position.toArray(),gardenRoads:garden.roads,flowerCount:garden.flowerCount,flowerRoots:garden.flowerRoots,shortcuts:this.memories.shortcutPaths,obstacles:this.obstacles,memories:this.memories.entries.map(e=>({id:e.id,x:e.x,z:e.z})),trails:[...this.memories.trailPaths]});
-      Object.assign(window,{__xiangmetaInspect:()=>({...inspect(),stations:this.stations.map(s=>({...s,hint:this.scene.getObjectByName(`station-${s.id}`)?.getObjectByName('solid-sign')?.userData.subtitle})),textures:textureStatus(),render:{pixelRatio:this.renderer.getPixelRatio(),shadowSize:renderSettings.shadowSize},foundations:this.scene.getObjectsByProperty('name','stratified-island').length}),
+      Object.assign(window,{__xiangmetaInspect:()=>({...inspect(),living:this.living.snapshot,stations:this.stations.map(s=>({...s,hint:this.scene.getObjectByName(`station-${s.id}`)?.getObjectByName('solid-sign')?.userData.subtitle})),textures:textureStatus(),render:{pixelRatio:this.renderer.getPixelRatio(),shadowSize:renderSettings.shadowSize},foundations:this.scene.getObjectsByProperty('name','stratified-island').length}),
         // Review helpers: a framed still (photo camera) or a first-person arrival.
         __xiangmetaFrame:(p:[number,number,number],t:[number,number,number],hour?:number)=>{this.photoMode(true);const camera=this.camera.clone();camera.position.set(...p);camera.lookAt(...t);this.photo.enter(camera);if(hour!==undefined){this.environment.hour=hour;this.environment.update(0,true);}this.renderer.shadowMap.needsUpdate=true;},
         __xiangmetaWalk:(x:number,z:number,tx:number,tz:number)=>{if(this.photo.active)this.photoMode(false);this.teleport(x,z,tx,tz);}});
@@ -229,6 +239,11 @@ export class World {
     else if(this.near)this.bus.emit('interact',this.near);
   }
   interactDiscovery(){if(!this.paused&&this.mode==='first-person'){if(this.memories.interact())return;this.wonders.interact();}}
+  interactLiving(key:'Q'|'T'){if(!this.paused&&this.mode==='first-person'){
+    this.living.update(0,this.player,this.camera,this.look.yaw,true,this.reduced.matches);
+    this.living.interact(key,this.player,this.look.yaw);this.updateLocation();this.syncCamera();
+    this.living.update(0,this.player,this.camera,this.look.yaw,true,this.reduced.matches);
+  }}
   visitMemory(id:string){const e=this.memories.location(id);if(!e)return;const approaches=Array.from({length:24},(_,i)=>({x:e.x+Math.sin(i*Math.PI/12)*1.3,z:e.z+Math.cos(i*Math.PI/12)*1.3}));const p=approaches.find(p=>walkable(p.x,p.z,this.data.regions,this.obstacles))??e;this.teleport(p.x,p.z,e.x,e.z);}
   trackMemory(id:string|null){this.memories.track(id);}
   visitHarbor(){this.teleport(harbor.arrival.x,harbor.arrival.z,harbor.terminal.x,harbor.terminal.z);}
@@ -253,10 +268,12 @@ export class World {
   captureMouse(){this.look.capture();}
   private teleport(x:number,z:number,tx:number,tz:number){
     this.look.release();let point={x,z};
-    if(!walkable(x,z,this.data.regions,this.obstacles)){
+    const mount=this.living.ride,obstacles=[...this.obstacles,...this.living.colliders,...(mount?[{x:mount.x,z:mount.z,radius:mount.radius,height:Infinity}]:[])];
+    if(!walkable(x,z,this.data.regions,obstacles)){
       const candidates=Array.from({length:48},(_,i)=>({x:x+Math.cos(i*.9)*(1+Math.floor(i/12)),z:z+Math.sin(i*.9)*(1+Math.floor(i/12))}));
-      const safe=candidates.find(p=>walkable(p.x,p.z,this.data.regions,this.obstacles));if(!safe)return;point=safe;
+      const safe=candidates.find(p=>walkable(p.x,p.z,this.data.regions,obstacles));if(!safe)return;point=safe;
     }
+    this.living.beforeTeleport();
     this.player=createWalker(point.x,point.z,this.data.regions);this.jumpRequested=false;Object.assign(this.look,lookAngles(point.x,point.z,tx,tz));this.resumeWalk();
     this.traveler?.reset(point.x,point.z);
     this.host.classList.remove('arriving');void this.host.offsetWidth;this.host.classList.add('arriving');this.updateLocation();this.updateNearby();this.bus.emit('sound','ui');
@@ -266,7 +283,7 @@ export class World {
   visit(m:Exhibit){const s=this.stations.find(s=>s.id===m.id)!;this.focusExhibit(m);this.teleport(s.approach.x,s.approach.z,s.x,s.z);this.runHook(m.id,'onVisit');}
   private runHook(id:string,event:'onVisit'|'onInteract'){try{this.extensions.get(id)?.hooks?.[event]?.();}catch(error){console.warn(`Module hook ${id} failed`,error);}}
   setParameter(id:string,value:number){this.parameters.set(id,value);}
-  private syncCamera(){this.camera.position.set(this.player.x,this.player.y+EYE_HEIGHT,this.player.z);this.camera.rotation.set(this.look.pitch,this.look.yaw,0,'YXZ');this.host.dataset.feetHeight=this.player.y.toFixed(3);this.host.dataset.grounded=String(this.player.grounded);}
+  private syncCamera(){this.camera.position.set(this.player.x,this.player.y+(this.living?.ride?this.living.ride.seat+.82:EYE_HEIGHT),this.player.z);this.camera.rotation.set(this.look.pitch,this.look.yaw,0,'YXZ');this.host.dataset.feetHeight=this.player.y.toFixed(3);this.host.dataset.grounded=String(this.player.grounded);}
   private updateLocation(){
     const region=this.data.regions.find(r=>Math.hypot(this.player.x-r.position[0],this.player.z-r.position[1])<r.radius)?.id
       ??'nexus';
@@ -299,7 +316,10 @@ export class World {
     const side=Number(this.keys.has('KeyD')||this.keys.has('ArrowRight'))-Number(this.keys.has('KeyA')||this.keys.has('ArrowLeft'))+this.touchSide;
     const strength=Math.min(1,Math.hypot(forward,side));
     const yaw=this.look.yaw,velocity=new T.Vector3(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side).normalize().multiplyScalar((this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')?8.5:5.2)*strength);
-    advanceWalker(this.player,{x:velocity.x,z:velocity.z,jump:this.jumpRequested},dt,this.data.regions,this.obstacles);this.jumpRequested=false;
+    const ride=this.living.ride;
+    if(ride){velocity.multiplyScalar(1.45);this.living.steerRide(velocity,dt);}
+    advanceWalker(this.player,{x:velocity.x,z:velocity.z,jump:this.jumpRequested},dt,this.data.regions,[...this.obstacles,...this.living.colliders],
+      ride?{jumpSpeed:10.2,canEnter:(x:number,z:number)=>this.living.canRide(x,z)}:{});this.jumpRequested=false;
     if(forward||side)this.updateLocation();
   }
   private animate=()=>{
@@ -320,6 +340,7 @@ export class World {
     for(const [id,e] of this.extensions)if(e.scene?.update)try{e.scene.update(motion,this.environment.hour);}catch(error){console.warn(`Module animation ${id} stopped`,error);e.scene.update=undefined;}
     for(const [id,obj] of this.objects){const pulse=obj.getObjectByName('pulse');if(pulse){const value=this.parameters.get(id)??.5;pulse.scale.setScalar(.7+value*.35+Math.sin(this.time*(1+value*4))*.15);}}
     const heading={x:-Math.sin(this.look.yaw),z:-Math.cos(this.look.yaw)},available=this.mode==='first-person'&&!this.paused;
+    this.living.update(this.paused?0:motion,this.player,this.camera,this.look.yaw,available,this.reduced.matches);
     const wonderScore=!this.near&&!this.nearArtwork?this.wonders.candidate(this.player.x,this.player.z,heading).score:-Infinity;
     const memoryScore=this.memories.candidate(this.player.x,this.player.z,heading).score;
     this.wonders.update(motion,this.player.x,this.player.z,available&&wonderScore>memoryScore,this.paused,heading);

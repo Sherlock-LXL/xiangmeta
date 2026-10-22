@@ -1,4 +1,5 @@
 import {actionIcon} from './core/action-icons';
+import {brandMark,mountBrandIcon} from './core/brand';
 import {navIcon} from './core/nav-icons';
 import {diagonalArrow} from './core/inline-arrow';
 import './style.css';
@@ -11,7 +12,7 @@ import {nearbyActions,type InteractionKey} from './core/nearby-actions';
 import {mountAlbumGallery} from './core/album-gallery';
 import { version } from '../package.json';
 import { catalog, invoke } from './core/api';
-import { EventBus } from './core/events';
+import { EventBus,type LivingPrompt } from './core/events';
 import { VisitorStore } from './core/storage';
 import { discoveries,type Exhibit } from './core/types';
 import { World } from './world/world';
@@ -32,7 +33,8 @@ const app=document.querySelector<HTMLDivElement>('#app')!;
 const touchExperience=document.documentElement.classList.contains('touch-experience');
 const escape=(value:unknown)=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 const icon=(name:string)=>({world:'◈',mountain:'△',science:'◌',museum:'▥',studio:'♫',guide:'✦',arrow:diagonalArrow,sound:'♪',map:'⌖',close:'×',star:'☆'}[name]??'◈');
-app.innerHTML='<div class="web-loading" id="world-loading"><span class="loading-symbol xiang-logo" aria-hidden="true">想</span><h1>XiangMeta</h1><span class="loading-subtitle">山海册页 · 一卷正在展开的个人世界</span><p>正在读取项目与世界档案…</p><progress aria-label="读取世界档案"></progress></div>';
+mountBrandIcon();
+app.innerHTML=`<div class="web-loading" id="world-loading"><span class="loading-symbol xiang-logo" aria-hidden="true">${brandMark}</span><h1>XiangMeta</h1><span class="loading-subtitle">山海册页 · 一卷正在展开的个人世界</span><p>正在读取项目与世界档案…</p><progress aria-label="读取世界档案"></progress></div>`;
 async function boot(){
   const data=await catalog();const bus=new EventBus(),store=new VisitorStore(),audio=new AudioSystem(bus,data.audio,(text,playing)=>{
     const caption=document.querySelector<HTMLElement>('#music-caption');if(caption){caption.textContent='♫ '+text;caption.dataset.playing=String(playing);}
@@ -41,7 +43,7 @@ async function boot(){
   app.classList.add('world-booting');
   app.innerHTML=`
     <aside class="sidebar">
-      <a class="brand" href="#" aria-label="返回世界总览"><span class="brand-symbol xiang-logo" aria-hidden="true">想</span><span>XiangMeta<small>A PERSONAL UNIVERSE</small></span></a>
+      <a class="brand" href="#" aria-label="返回世界总览"><span class="brand-symbol xiang-logo" aria-hidden="true">${brandMark}</span><span>XiangMeta<small>A PERSONAL UNIVERSE</small></span></a>
       <div class="side-caption">EXPLORATION <span>探索无界</span></div>
       <button class="nav-overview active" id="overview" aria-label="世界总览" title="世界总览">${navIcon('world')} <span>世界总览</span><span class="nav-end">⌘</span></button>
       <div class="nav-section-label">探索大陆</div>
@@ -69,7 +71,7 @@ async function boot(){
       <div class="toast" role="status" aria-live="polite" hidden></div>
     </main>
     <dialog id="inspector" aria-labelledby="panel-title"><div id="panel-content"></div></dialog>
-    <div class="web-loading" id="world-loading"><span class="loading-symbol xiang-logo" aria-hidden="true">想</span><h1>XiangMeta</h1><span class="loading-subtitle">山海册页 · 一卷正在展开的个人世界</span><p id="load-label" role="status">正在构建群岛…</p><progress id="world-progress" max="100" value="0" aria-label="构建世界"></progress><small id="load-percent">0%</small><a href="${sitePath('projects/')}">浏览项目 →</a></div>`;
+    <div class="web-loading" id="world-loading"><span class="loading-symbol xiang-logo" aria-hidden="true">${brandMark}</span><h1>XiangMeta</h1><span class="loading-subtitle">山海册页 · 一卷正在展开的个人世界</span><p id="load-label" role="status">正在构建群岛…</p><progress id="world-progress" max="100" value="0" aria-label="构建世界"></progress><small id="load-percent">0%</small><a href="${sitePath('projects/')}">浏览项目 →</a></div>`;
   const $=<T extends HTMLElement=HTMLElement>(selector:string)=>document.querySelector<T>(selector)!;
   const dialog=$<HTMLDialogElement>('#inspector');let world:World|undefined;let current:Exhibit|undefined;let abort:AbortController|undefined;
   $('.local-badge').innerHTML=`<a href="${sitePath('projects/')}">Projects ${diagonalArrow}</a>`;
@@ -267,9 +269,13 @@ async function boot(){
   $('#sky-settings').onclick=()=>{
     const time=world?.timeOfDay??9;
     showPanel(panelHeader('ISLAND TIME','让光，慢慢经过')+`<p class="panel-description">日出时月亮沉入海面，日落时月亮从另一侧升起。<br>白天是柔和的奶油色，夜晚是月光与温暖的灯带。</p><div class="time-presets"><button data-hour="6.2">☀<b>晨曦</b><small>06:12</small></button><button data-hour="10">◉<b>晴昼</b><small>10:00</small></button><button data-hour="17.8">◒<b>暮色</b><small>17:48</small></button><button data-hour="22">☾<b>月夜</b><small>22:00</small></button></div><label class="time-slider">时刻 <output id="time-value"></output><input aria-label="世界时刻" id="time-range" type="range" min="0" max="24" step=".05" value="${time}"/></label><label class="quality-option"><input type="checkbox" id="cycle-time" ${world?.timeCycling?'checked':''}/> 自然流转 · 16 分钟一昼夜</label><label class="weather-choice">天气<select id="weather-select" aria-label="世界天气"><option value="auto">自动 · 随机流转</option>${weatherKinds.map((kind:string)=>`<option value="${kind}">${weatherNames[kind as keyof typeof weatherNames]}</option>`).join('')}</select></label><p class="source-note">天气用约 12 秒渐变，自动模式每隔约 2–4 分钟流转。摄影模式暂停天气与云的移动。<br>选择时刻会平滑过渡。关闭自然流转，可以把世界留在喜欢的光线中。</p>`);
-    const weather=$<HTMLSelectElement>('#weather-select');weather.value=world?.weather.automatic?'auto':world?.weather.kind??'sunny';weather.onchange=()=>world?.setWeather(weather.value);
+    const weather=$<HTMLSelectElement>('#weather-select');weather.value=world?.weather.automatic?'auto':world?.weather.kind??'sunny';weather.onchange=()=>{
+      world?.setWeather(weather.value);const hour=weather.value==='aurora'?22:weather.value==='sunset'?17.4:null;
+      if(hour!==null){world?.setTime(hour);input.value=String(hour);label(hour);}
+    };
+    weather.closest('label')!.insertAdjacentHTML('afterend','<p class="source-note">远海可见龙卷风，冰雹落地会轻轻反弹。选择极光会移到月夜，选择霞光会移到傍晚；自动流转时，光带随昼夜显现。</p>');
     const input=$<HTMLInputElement>('#time-range'),output=$<HTMLOutputElement>('#time-value');
-    const label=(h:number)=>output.value=`${String(Math.floor(h)%24).padStart(2,'0')}:${String(Math.floor(h%1*60)).padStart(2,'0')}`;label(time);
+    const label=(h:number)=>{const minutes=Math.round(h*60);output.value=`${String(Math.floor(minutes/60)%24).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;};label(time);
     input.oninput=()=>{const h=Number(input.value);label(h);world?.setTime(h);};
     dialog.querySelectorAll<HTMLButtonElement>('[data-hour]').forEach(b=>b.onclick=()=>{const h=Number(b.dataset.hour);input.value=String(h);label(h);world?.setTime(h);});
     $<HTMLInputElement>('#cycle-time').onchange=e=>world?.cycleTime((e.target as HTMLInputElement).checked);
@@ -286,7 +292,7 @@ async function boot(){
   $('#sound').onclick=async()=>{store.muted=!store.muted;soundLabel();try{await audio.setMuted(store.muted);store.save();toast(store.muted?'音乐与音效已暂停':'BGM、四季音乐与风铃已开启');}catch{store.muted=true;soundLabel();toast('音乐暂时不可用，请点击 ♪ 重试');}};
   soundLabel();
   const helpControls=touchExperience?'<p>拖动左下摇杆：控制行走方向与速度</p><p>在世界画面上拖动：环顾四周；右下「跳跃」越过台阶</p><p>移动与环顾支持双指同时操作，两个触点互不干扰</p><p>靠近展台后，直接点击浮窗中的 GitHub、简介、Demo 或展览按钮</p><p>左上菜单：切换区域、打开世界总览、项目索引、记忆与摄影工具</p>':'<p><kbd>W A S D</kbd> 或方向键：行走；Shift 加速；Space 跳跃</p><p>点击画布或「进入环顾」：鼠标环顾；也可以按住拖动</p><p><kbd>F</kbd>：打开项目 GitHub；没有仓库链接时打开展览；作品前查看作品，港口查看航线</p><p><kbd>E</kbd>：查看项目简介、技术栈、结果与资料</p><p><kbd>R</kbd>：打开 Demo / 音乐 / MV，仅有链接的项目显示</p><p><kbd>G</kbd>：收集记忆或体验趣味装置</p><p><kbd>P</kbd>：摄影模式；WASD 平移，Q / E 升降，导出明信片</p><p>左侧区域导航：传送；「世界总览」：拖动旋转与滚轮缩放</p><p><kbd>Esc</kbd>：释放鼠标或关闭面板；关闭后可继续探索</p>';
-  $('#help').onclick=()=>{showPanel(panelHeader('FIELD NOTES','以自己的视角，走进世界')+`<div class="help-grid">${helpControls}</div><label class="quality-option"><input type="checkbox" id="low-quality"/> 降低渲染质量，适配低性能设备</label><p class="source-note">科研模拟按论文方程计算，默认值是演示参数。个人音乐和 MV 在外部平台打开。</p>`);$<HTMLInputElement>('#low-quality').checked=world?.isLowQuality??false;$<HTMLInputElement>('#low-quality').onchange=e=>world?.quality((e.target as HTMLInputElement).checked);};
+  $('#help').onclick=()=>{showPanel(panelHeader('FIELD NOTES','以自己的视角，走进世界')+`<div class="help-grid">${helpControls}<p><kbd>Q</kbd>：拿起／放下四季小物，靠近动物时抚摸；触屏直接点浮窗按钮</p><p><kbd>T</kbd>：骑上梅花鹿或北极熊／下来；岛内移动速度 ×1.45，跳跃更高</p><p>绿圈表示可以放下物品；避开门口、岸边与斜坡。动物会休息、散步和偶尔好奇地看你。</p></div><label class="quality-option"><input type="checkbox" id="low-quality"/> 降低渲染质量，适配低性能设备</label><p class="source-note">科研模拟按论文方程计算，默认值是演示参数。个人音乐和 MV 在外部平台打开。</p>`);$<HTMLInputElement>('#low-quality').checked=world?.isLowQuality??false;$<HTMLInputElement>('#low-quality').onchange=e=>world?.quality((e.target as HTMLInputElement).checked);};
   const openExternal=(url:string)=>{if(document.pointerLockElement)document.exitPointerLock();window.open(url,'_blank','noopener,noreferrer');};
   bus.on('select',m=>openExhibit(m));bus.on('interact',m=>{const {github}=projectLinks(m);if(github)openExternal(github);else openExhibit(m,true);});
   bus.on('demo',m=>{const {demo}=projectLinks(m);if(demo)openExternal(demo);});
@@ -295,8 +301,14 @@ async function boot(){
   bus.on('view',mode=>{$('.main-world').classList.toggle('first-person',mode==='first-person');$('#view-name').textContent=mode==='first-person'?'第一人称探索':'世界地图';$('#capture-look').hidden=mode==='map';$('#look-hint').textContent=mode==='map'?'拖动旋转 · 滚轮缩放':'点击 / 拖动环顾 · Esc 释放鼠标';if(mode==='first-person'){const english=$('.coordinates small').textContent;$('#current-region').textContent=data.regions.find(r=>r.english===english)?.title??'中央枢纽';}});
   bus.on('look',locked=>{$('.main-world').classList.toggle('mouse-locked',locked);$('#capture-look').textContent=locked?'Esc 释放鼠标':'点击进入环顾';});
   bus.on('region',id=>{const r=data.regions.find(r=>r.id===id);$('#current-region').textContent=r?.title??'中央枢纽';$('.coordinates small').textContent=r?.english??'XIANGMETA NEXUS';document.querySelectorAll<HTMLButtonElement>('.region-nav').forEach(b=>b.classList.toggle('active',b.dataset.region===id));$('#overview').classList.toggle('active',id==='nexus');});
-  let nearbyModule:Exhibit|null=null,nearbyArtwork:ArtworkInteraction|null=null,nearbyHarbor=false;
+  let nearbyModule:Exhibit|null=null,nearbyArtwork:ArtworkInteraction|null=null,nearbyHarbor=false,nearbyLiving:LivingPrompt|null=null;
   const renderNearby=()=>{
+    if(nearbyLiving){
+      const p=nearbyLiving,prompt=$('#interaction-prompt'),button=$<HTMLButtonElement>('#nearby');
+      prompt.hidden=false;prompt.innerHTML=`<div class="nearby-copy"><b>${escape(p.title)}</b><small>${escape(p.detail)}</small></div><div class="nearby-actions">${p.q?`<button data-living-key="Q" ${p.disabled?'disabled':''}><kbd>Q</kbd> ${escape(p.q)}</button>`:''}${p.t?`<button data-living-key="T"><kbd>T</kbd> ${escape(p.t)}</button>`:''}</div>`;
+      prompt.querySelectorAll<HTMLButtonElement>('[data-living-key]').forEach(b=>b.onclick=()=>world?.interactLiving(b.dataset.livingKey as 'Q'|'T'));
+      button.disabled=p.disabled&&!p.t;button.innerHTML=`<kbd>${p.q?'Q':'T'}</kbd> ${escape(p.title)}`;button.onclick=()=>world?.interactLiving(p.q?'Q':'T');return;
+    }
     const m=nearbyArtwork?.module??nearbyModule,actions=nearbyActions(nearbyModule,nearbyArtwork,nearbyHarbor),title=nearbyHarbor?'海风港口':nearbyArtwork?.label??m?.portfolio?.name??m?.title;
     const prompt=$('#interaction-prompt'),button=$<HTMLButtonElement>('#nearby'),primary=actions[0];button.disabled=!primary;button.innerHTML=`<kbd>${primary?.key??'F'}</kbd> ${title?escape(title):'靠近展台交互'}`;button.title=primary?`${primary.key} · ${primary.label}`:'靠近展台交互';
     prompt.hidden=!title;
@@ -304,6 +316,7 @@ async function boot(){
     prompt.querySelectorAll<HTMLButtonElement>('button[data-near-key]').forEach(b=>b.onclick=()=>world?.interactExhibit(b.dataset.nearKey as InteractionKey));button.onclick=()=>primary&&world?.interactExhibit(primary.key);
   };
   bus.on('harborNearby',v=>{nearbyHarbor=v;renderNearby();});
+  bus.on('livingNearby',v=>{nearbyLiving=v;renderNearby();});bus.on('livingMessage',toast);
   bus.on('nearby',m=>{nearbyModule=m;renderNearby();});bus.on('artworkNearby',a=>{nearbyArtwork=a;renderNearby();});
   bus.on('artwork',a=>{if(a.action.kind==='album')openExhibit(a.module,true,a.action.id);else immerse(a.module,a.action.index);});
 

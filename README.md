@@ -54,15 +54,27 @@ Use HTTP(S), including for a local preview. Opening `index.html` through
 | E | Project description, technologies, results and exhibition |
 | R | Demo / music / MV, shown only when a destination exists |
 | G | Discoveries and memory fragments |
+| Q | Pick up / place seasonal objects, or pet the animal you face |
+| T | Ride a deer / polar bear, or dismount on clear ground |
 | P | Photo mode; WASD moves, Q / E changes altitude |
 | Esc | Close panel / release pointer |
 | Sidebar region | Teleport |
 | World overview | Orbit map |
 | ♪ sound button | Start / pause background music, seasonal cues and chimes |
 
-On touch devices the 3D entrance recommends the ordinary Portfolio. An
-explicit “still load 3D” option remains available; touch walking is not a V1
-feature. The Help panel offers reduced rendering quality.
+Touch devices have a movement joystick, drag-to-look, jump and contextual
+interaction buttons. The Help panel offers reduced rendering quality.
+
+The original four islands contain 16 portable objects and ten animals.
+Animals alternate between resting, wandering, grazing and curious looks;
+petting produces hearts. Mounts move 1.45× faster and jump higher within their
+home island. Object placement requires clear, level ground and keeps entrances
+open. Object arrangements last for the current visit.
+
+Island Time includes distant tornadoes, hail, aurora and sunset skies. Choosing
+aurora or sunset also selects a suitable hour. Photo mode freezes their motion.
+Run `node tests/living-browser.mjs` for the object, pet, mount and weather checks;
+`TEST_WEBKIT=1` includes WebKit.
 
 ## Content and architecture
 

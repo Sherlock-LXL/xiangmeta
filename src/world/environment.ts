@@ -42,15 +42,26 @@ export class Environment {
   get horizon(){return this.current.horizon;}
   constructor(private scene:T.Scene,regions:Region[]){
     scene.fog=new T.FogExp2('#efe3c6',.0026);
-    this.skyMaterial=new T.ShaderMaterial({side:T.BackSide,depthWrite:false,depthTest:false,uniforms:{zenith:{value:new T.Color()},horizon:{value:new T.Color()},glow:{value:new T.Color()},sunDirection:{value:new T.Vector3(0,1,0)},time:{value:0},night:{value:0}},
+    this.skyMaterial=new T.ShaderMaterial({side:T.BackSide,depthWrite:false,depthTest:false,uniforms:{zenith:{value:new T.Color()},horizon:{value:new T.Color()},glow:{value:new T.Color()},sunDirection:{value:new T.Vector3(0,1,0)},time:{value:0},night:{value:0},aurora:{value:0},sunset:{value:0}},
       vertexShader:'varying vec3 vDir;void main(){vDir=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader:`uniform vec3 zenith,horizon,glow,sunDirection;uniform float time,night;varying vec3 vDir;${NOISE}
+      fragmentShader:`uniform vec3 zenith,horizon,glow,sunDirection;uniform float time,night,aurora,sunset;varying vec3 vDir;${NOISE}
       void main(){vec3 d=normalize(vDir);float h=d.y,up=pow(max(h,0.),.62);
         vec3 c=mix(horizon,zenith,up);
         // Long silk streaks: the weave of the ground, not weather.
         float az=atan(d.z,d.x);float streak=fbm(vec2(az*4.,h*30.)+vec2(time*.003,0.));
         c=mix(c,mix(horizon,vec3(1.),.08),smoothstep(.56,.86,streak)*(1.-up)*.4*(1.-night));
         float toward=max(dot(d,sunDirection),0.);c+=glow*(pow(toward,5.)*.32+pow(toward,40.)*.25)*(1.-up*.5);
+        float silk=fbm(vec2(az*2.8,h*17.)+vec2(time*.008,-time*.002));
+        float cloudBand=smoothstep(.3,.65,silk)*smoothstep(.03,.12,h)*(1.-smoothstep(.25,.65,h));
+        c=mix(c,mix(vec3(.86,.34,.31),vec3(1.,.65,.36),silk),cloudBand*sunset*.76*(1.-night));
+        for(int i=0;i<3;i++){
+          float fi=float(i),ribbon=.23+fi*.09+sin(az*2.+fi+time*.027)*.055+sin(az*5.-time*.035+fi)*.025;
+          float distance=h-ribbon;
+          float curtain=exp(-abs(distance)*mix(14.,55.,step(distance,0.)))*smoothstep(-.025,.016,distance+.025);
+          float folds=.6+.4*sin(az*95.+sin(az*13.+time*.06)*4.);
+          vec3 light=mix(vec3(.24,.76,.57),vec3(.5,.42,.76),smoothstep(.02,.17,distance));
+          c+=light*curtain*folds*aurora*night*.3*smoothstep(.04,.12,h);
+        }
         c=mix(c,horizon,smoothstep(.03,-.05,h));
         gl_FragColor=vec4(c,1.);
         #include <tonemapping_fragment>
@@ -60,7 +71,7 @@ export class Environment {
     scene.add(this.sky,this.ambient,this.light,this.light.target,this.sun,this.moon);
     // Bounding spheres of the hub, the harbour and the four islands; the mountain carries its pagoda above the ridge.
     const islands=[{x:0,y:3,z:0,radius:10},{x:0,y:-3,z:(harbor.rampStart+harbor.deckEnd)/2,radius:11},...regions.map(r=>({x:r.position[0],y:r.terrain?6:1,z:r.position[1],radius:r.radius+(r.terrain?4:1.5)}))];
-    this.weather=new Weather(scene,islands);this.sun.material.transparent=true;this.moon.material.transparent=true;
+    this.weather=new Weather(scene,islands,regions);this.sun.material.transparent=true;this.moon.material.transparent=true;
     this.sun.name='orbit-sun';this.moon.name='orbit-moon';this.sun.renderOrder=this.moon.renderOrder=-30;
     const haloCanvas=document.createElement('canvas');haloCanvas.width=haloCanvas.height=128;
     const ctx=haloCanvas.getContext('2d')!,gradient=ctx.createRadialGradient(64,64,6,64,64,64);
@@ -159,10 +170,10 @@ export class Environment {
   collectLights(){this.scene.traverse(o=>{if(o instanceof T.Mesh){for(const m of Array.isArray(o.material)?o.material:[o.material])if(m instanceof T.MeshStandardMaterial&&m.userData.nightGlow)this.glows.add(m);}});}
   setHour(hour:number){this.targetHour=((hour%24)+24)%24;}
   restoreTime(hour:number,cycling:boolean){this.cycling=cycling;this.setHour(hour);}
-  private blend(day:number,twilight:number,weather:{shade:number;snow:number}){
+  private blend(day:number,twilight:number,weather:{shade:number;snow:number;sunset:number}){
     const {day:d,dusk,night,storm,snow}=this.washes;
     for(const key of Object.keys(this.current)){
-      const c=this.current[key].copy(night[key]).lerp(d[key],day).lerp(dusk[key],twilight*.75);
+      const c=this.current[key].copy(night[key]).lerp(d[key],day).lerp(dusk[key],Math.max(twilight*.75,weather.sunset*day*.7));
       if(storm[key])c.lerp(this.color.copy(storm[key]).lerp(night[key],1-day),weather.shade*.85);
       if(snow[key])c.lerp(this.color.copy(snow[key]).lerp(night[key],(1-day)*.9),weather.snow*.5);
     }
@@ -174,6 +185,8 @@ export class Environment {
     const state=daylight(this.hour),day=state.day,twilight=state.twilight;
     this.weather.update(dt,freezeMotion,observer,day,this.reduced.matches);const weather=this.weather.cycle.value;
     this.blend(day,twilight,weather);
+    this.current.horizon.lerp(this.color.set('#efb38f'),weather.sunset*day*.7);
+    this.current.zenith.lerp(this.color.set('#aaaacb'),weather.sunset*day*.45);
     this.sky.position.copy(observer);this.stars.position.copy(observer);
     this.sun.position.set(Math.cos(state.angle)*400,state.altitude*400,Math.cos(state.angle)*-110);
     this.moon.position.copy(this.sun.position).multiplyScalar(-1);this.moon.lookAt(0,0,0);
@@ -192,6 +205,7 @@ export class Environment {
     this.ambient.groundColor.set('#3e4b5e').lerp(this.color.set('#b2c5b3'),day);
     const sky=this.skyMaterial.uniforms;
     sky.zenith.value.copy(this.current.zenith);sky.horizon.value.copy(this.current.horizon);sky.time.value=this.elapsed;sky.night.value=1-day;
+    sky.aurora.value=weather.aurora;sky.sunset.value=weather.sunset;
     sky.glow.value.set('#ffd9a8').lerp(this.color.set('#ff8a55'),twilight).multiplyScalar(this.sun.visible?(1-weather.shade)*(.35+twilight*.9):0);
     sky.sunDirection.value.copy(this.sun.position).normalize();
     this.scene.environmentIntensity=(.1+day*.16)*(1-weather.shade*.3);

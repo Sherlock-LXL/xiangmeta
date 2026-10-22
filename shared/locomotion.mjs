@@ -10,8 +10,8 @@ function topAt(x,z,obstacles,regions){
   return top;
 }
 /** Feet position, swept vertical landing, and short collision substeps. No renderer dependency. */
-export function advanceWalker(state,input,dt,regions,obstacles){
-  if(input.jump&&state.grounded){state.vy=JUMP_SPEED;state.grounded=false;}
+export function advanceWalker(state,input,dt,regions,obstacles,options={}){
+  if(input.jump&&state.grounded){state.vy=options.jumpSpeed??JUMP_SPEED;state.grounded=false;}
   const steps=Math.max(1,Math.ceil(Math.min(.1,Math.max(0,dt))/(1/120))),h=Math.min(.1,Math.max(0,dt))/steps;
   for(let i=0;i<steps;i++){
     const before=state.y;
@@ -21,6 +21,7 @@ export function advanceWalker(state,input,dt,regions,obstacles){
     for(const axis of ['x','z']){
       const x=state.x+(axis==='x'?input.x*h:0),z=state.z+(axis==='z'?input.z*h:0);
       if(!onGround(x,z,regions))continue;
+      if(options.canEnter&&!options.canEnter(x,z))continue;
       const top=topAt(x,z,obstacles,regions);
       if(state.grounded&&Math.abs(top-state.y)<=STEP_HEIGHT){state.y=top;state[axis]=axis==='x'?x:z;}
       else if(walkable(x,z,regions,obstacles,state.y))state[axis]=axis==='x'?x:z;
