@@ -305,9 +305,18 @@ async function boot(){
   const renderNearby=()=>{
     if(nearbyLiving){
       const p=nearbyLiving,prompt=$('#interaction-prompt'),button=$<HTMLButtonElement>('#nearby');
-      prompt.hidden=false;prompt.innerHTML=`<div class="nearby-copy"><b>${escape(p.title)}</b><small>${escape(p.detail)}</small></div><div class="nearby-actions">${p.q?`<button data-living-key="Q" ${p.disabled?'disabled':''}><kbd>Q</kbd> ${escape(p.q)}</button>`:''}${p.t?`<button data-living-key="T"><kbd>T</kbd> ${escape(p.t)}</button>`:''}</div>`;
-      prompt.querySelectorAll<HTMLButtonElement>('[data-living-key]').forEach(b=>b.onclick=()=>world?.interactLiving(b.dataset.livingKey as 'Q'|'T'));
-      button.disabled=p.disabled&&!p.t;button.innerHTML=`<kbd>${p.q?'Q':'T'}</kbd> ${escape(p.title)}`;button.onclick=()=>world?.interactLiving(p.q?'Q':'T');return;
+      // Keep the actual buttons alive while an animal changes its behaviour. Replacing
+      // them between pointerdown and pointerup used to swallow touch interactions.
+      if(!prompt.querySelector('[data-living-key]')){
+        prompt.innerHTML=`<div class="nearby-copy"><b></b><small></small></div><div class="nearby-actions">${['Q','T'].map(key=>`<button data-living-key="${key}">${touchExperience?'':`<kbd>${key}</kbd> `}<span></span></button>`).join('')}</div>`;
+        prompt.querySelectorAll<HTMLButtonElement>('[data-living-key]').forEach(b=>b.onclick=()=>world?.interactLiving(b.dataset.livingKey as 'Q'|'T'));
+      }
+      prompt.hidden=false;prompt.querySelector('b')!.textContent=p.title;prompt.querySelector('small')!.textContent=p.detail;
+      for(const key of ['Q','T'] as const){
+        const b=prompt.querySelector<HTMLButtonElement>(`[data-living-key="${key}"]`)!,label=key==='Q'?p.q:p.t;
+        b.hidden=!label;b.disabled=key==='Q'&&p.disabled;b.querySelector('span')!.textContent=label??'';
+      }
+      button.disabled=(!p.q&&!p.t)||(p.disabled&&!p.t);button.innerHTML=`${p.q||p.t?`<kbd>${p.q?'Q':'T'}</kbd> `:''}${escape(p.title)}`;button.onclick=()=>world?.interactLiving(p.q?'Q':'T');return;
     }
     const m=nearbyArtwork?.module??nearbyModule,actions=nearbyActions(nearbyModule,nearbyArtwork,nearbyHarbor),title=nearbyHarbor?'海风港口':nearbyArtwork?.label??m?.portfolio?.name??m?.title;
     const prompt=$('#interaction-prompt'),button=$<HTMLButtonElement>('#nearby'),primary=actions[0];button.disabled=!primary;button.innerHTML=`<kbd>${primary?.key??'F'}</kbd> ${title?escape(title):'靠近展台交互'}`;button.title=primary?`${primary.key} · ${primary.label}`:'靠近展台交互';

@@ -27,16 +27,16 @@ export const seasonalObjects={
 
 /** One of each species, distributed among the original four seasonal islands. */
 export const animalSpecies=[
-  {kind:'cat',name:'花狸猫',season:'spring',radius:.65,height:.94,speed:.6,ride:false,seat:0},
-  {kind:'deer',name:'梅花鹿',season:'spring',radius:1.05,height:2,speed:.7,ride:true,seat:1.2},
-  {kind:'rabbit',name:'桃花兔',season:'spring',radius:.65,height:.84,speed:.55,ride:false,seat:0},
-  {kind:'crab',name:'沙滩蟹',season:'summer',radius:.65,height:.35,speed:.35,ride:false,seat:0},
-  {kind:'heron',name:'苍鹭',season:'summer',radius:.65,height:1.45,speed:.4,ride:false,seat:0},
-  {kind:'tortoise',name:'小陆龟',season:'summer',radius:.65,height:.42,speed:.18,ride:false,seat:0},
-  {kind:'fox',name:'赤狐',season:'autumn',radius:.85,height:.9,speed:.7,ride:false,seat:0},
-  {kind:'shiba',name:'柴犬',season:'autumn',radius:.65,height:.85,speed:.62,ride:false,seat:0},
-  {kind:'polar-bear',name:'北极熊',season:'winter',radius:1.12,height:1.42,speed:.55,ride:true,seat:1.08},
-  {kind:'penguin',name:'小企鹅',season:'winter',radius:.65,height:.8,speed:.35,ride:false,seat:0},
+  {kind:'cat',name:'花狸猫',season:'spring',radius:.72,bodyRadius:.19,bodyLength:.23,height:1.02,speed:.72,stride:.42,ride:false,seat:0},
+  {kind:'deer',name:'梅花鹿',season:'spring',radius:1.06,bodyRadius:.28,bodyLength:.42,height:2.12,speed:.85,stride:1.05,ride:true,seat:1.22},
+  {kind:'rabbit',name:'桃花兔',season:'spring',radius:.62,bodyRadius:.19,bodyLength:.14,height:.98,speed:.7,stride:.48,ride:false,seat:0},
+  {kind:'crab',name:'沙滩蟹',season:'summer',radius:.66,bodyRadius:.29,bodyLength:.08,height:.48,speed:.45,stride:.22,ride:false,seat:0},
+  {kind:'heron',name:'苍鹭',season:'summer',radius:.7,bodyRadius:.17,bodyLength:.19,height:1.62,speed:.44,stride:.58,ride:false,seat:0},
+  {kind:'tortoise',name:'小陆龟',season:'summer',radius:.63,bodyRadius:.26,bodyLength:.14,height:.48,speed:.18,stride:.22,ride:false,seat:0},
+  {kind:'fox',name:'赤狐',season:'autumn',radius:.95,bodyRadius:.2,bodyLength:.25,height:1.02,speed:.85,stride:.55,ride:false,seat:0},
+  {kind:'shiba',name:'柴犬',season:'autumn',radius:.75,bodyRadius:.22,bodyLength:.23,height:.96,speed:.78,stride:.5,ride:false,seat:0},
+  {kind:'polar-bear',name:'北极熊',season:'winter',radius:1.18,bodyRadius:.39,bodyLength:.43,height:1.58,speed:.72,stride:.95,ride:true,seat:1.12},
+  {kind:'penguin',name:'小企鹅',season:'winter',radius:.56,bodyRadius:.22,bodyLength:.08,height:.91,speed:.44,stride:.27,ride:false,seat:0},
 ];
 
 export const seededRandom=(seed=0x71a2)=>()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);

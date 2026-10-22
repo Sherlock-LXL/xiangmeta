@@ -238,7 +238,7 @@ export class World {
     else if(this.nearArtwork)this.bus.emit('artwork',this.nearArtwork);
     else if(this.near)this.bus.emit('interact',this.near);
   }
-  interactDiscovery(){if(!this.paused&&this.mode==='first-person'){if(this.memories.interact())return;this.wonders.interact();}}
+  interactDiscovery(){if(!this.paused&&this.mode==='first-person'&&!this.living.focused){if(this.memories.interact())return;this.wonders.interact();}}
   interactLiving(key:'Q'|'T'){if(!this.paused&&this.mode==='first-person'){
     this.living.update(0,this.player,this.camera,this.look.yaw,true,this.reduced.matches);
     this.living.interact(key,this.player,this.look.yaw);this.updateLocation();this.syncCamera();
@@ -319,7 +319,7 @@ export class World {
     const ride=this.living.ride;
     if(ride){velocity.multiplyScalar(1.45);this.living.steerRide(velocity,dt);}
     advanceWalker(this.player,{x:velocity.x,z:velocity.z,jump:this.jumpRequested},dt,this.data.regions,[...this.obstacles,...this.living.colliders],
-      ride?{jumpSpeed:10.2,canEnter:(x:number,z:number)=>this.living.canRide(x,z)}:{});this.jumpRequested=false;
+      ride?{jumpSpeed:10.2,radius:ride.radius,canEnter:(x:number,z:number)=>this.living.canRide(x,z)}:{});this.jumpRequested=false;
     if(forward||side)this.updateLocation();
   }
   private animate=()=>{
@@ -343,8 +343,8 @@ export class World {
     this.living.update(this.paused?0:motion,this.player,this.camera,this.look.yaw,available,this.reduced.matches);
     const wonderScore=!this.near&&!this.nearArtwork?this.wonders.candidate(this.player.x,this.player.z,heading).score:-Infinity;
     const memoryScore=this.memories.candidate(this.player.x,this.player.z,heading).score;
-    this.wonders.update(motion,this.player.x,this.player.z,available&&wonderScore>memoryScore,this.paused,heading);
-    this.memories.update(motion,this.player.x,this.player.z,available&&memoryScore>=wonderScore,this.reduced.matches,heading);
+    this.wonders.update(motion,this.player.x,this.player.z,available&&!this.living.focused&&wonderScore>memoryScore,this.paused,heading);
+    this.memories.update(motion,this.player.x,this.player.z,available&&!this.living.focused&&memoryScore>=wonderScore,this.reduced.matches,heading);
     // The sun completes an orbit in 16 minutes; three shadow updates per second retain its motion
     // without redrawing every static island at the same rate as the first-person camera.
     this.shadowTime+=dt;if(this.shadowTime>=renderSettings.shadowInterval){this.renderer.shadowMap.needsUpdate=true;this.shadowTime=0;}
