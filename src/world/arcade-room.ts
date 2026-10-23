@@ -1,4 +1,4 @@
-import {Arcade,arcadeCatalog,arcadeScoreKey,blockInterval,mergeDuration} from '../../shared/arcade.mjs';
+import {Arcade,arcadeCatalog,arcadeScoreKey,mergeDuration} from '../../shared/arcade.mjs';
 import {readBest,saveBest} from '../../shared/seasonal-games.mjs';
 import {orbRadii,orbNames} from '../../shared/falling-merge.mjs';
 
@@ -12,7 +12,7 @@ export class ArcadeRoom{
   private score=-1;private best:number|null;private drag:{x:number;y:number}|null=null;
   constructor(private host:HTMLElement,private id:string,private storage:Storage,back:()=>void){
     const spec=arcadeCatalog.find(g=>g.id===id)!;this.game=new Arcade(id);this.best=readBest(storage,arcadeScoreKey(id));
-    host.innerHTML=`<div class="game-dialog-head"><span class="game-eyebrow">WINTER / 雪夜游艺室</span><button data-back aria-label="返回小游戏列表">← 返回</button></div><h2>${spec.name}</h2><p class="game-description">${spec.hint}</p><div class="arcade-layout"><div class="arcade-stage"><canvas width="480" height="480" tabindex="0" aria-label="${spec.name}游戏画面"></canvas><div class="arcade-result" role="status" hidden></div></div><div class="arcade-side"><div class="arcade-score" aria-live="off"></div><p>${spec.detail}</p><div class="arcade-actions"><button data-pause>暂停</button><button data-restart>重新开始</button></div><div class="arcade-pad" aria-label="游戏触屏操作"><button data-key="up" aria-label="向上或旋转">↑</button><button data-key="left" aria-label="向左">←</button><button data-key="down" aria-label="向下">↓</button><button data-key="right" aria-label="向右">→</button><button data-key="space">${id==='bricks'?'发球':'落到底部'}</button></div><div class="arcade-cards" aria-label="翻牌选择"></div><small>最佳成绩保存在此浏览器。<br>P 暂停 / 继续 · Esc 返回列表</small></div></div>`;
+    host.innerHTML=`<div class="game-dialog-head"><span class="game-eyebrow">雪夜游艺室</span><button data-back aria-label="返回小游戏列表">← 返回</button></div><h2>${spec.name}</h2><p class="game-description">${spec.hint}</p><div class="arcade-layout"><div class="arcade-stage"><canvas width="480" height="480" tabindex="0" aria-label="${spec.name}游戏画面"></canvas><div class="arcade-result" role="status" hidden></div></div><div class="arcade-side"><div class="arcade-score" aria-live="off"></div><div class="arcade-actions"><button data-pause>暂停</button><button data-restart>重新开始</button></div><div class="arcade-pad" aria-label="游戏触屏操作"><button data-key="up" aria-label="向上或旋转">↑</button><button data-key="left" aria-label="向左">←</button><button data-key="down" aria-label="向下">↓</button><button data-key="right" aria-label="向右">→</button><button data-key="space">${id==='bricks'?'发球':'直接落下'}</button></div><div class="arcade-cards" aria-label="翻牌选择"></div><small>P 暂停 · Esc 返回</small></div></div>`;
     this.canvas=host.querySelector('canvas')!;this.ctx=this.canvas.getContext('2d')!;this.status=host.querySelector('.arcade-score')!;this.result=host.querySelector('.arcade-result')!;
     const opts={signal:this.events.signal};
     host.querySelector('[data-back]')!.addEventListener('click',back,opts);
@@ -56,9 +56,9 @@ export class ArcadeRoom{
       if(this.repeat<=0){this.repeat=.09;if(this.id==='blocks')for(const key of held)if(['left','right','down'].includes(key))this.press(key);}
       this.game.axis=Number(held.has('right'))-Number(held.has('left'));this.game.update(dt);
     }
-    if(this.game.over&&!this.recorded&&this.game.mergeAge>=mergeDuration){const r=this.store();this.result.hidden=false;this.result.innerHTML=`<b>${this.game.won&&this.id!=='merge'?'✦ 完成啦':'本局结束'}</b><span>${this.game.score} 分${r?.record?' · 新纪录':''}</span><small>${r?.saved?'成绩已保存':'暂时无法保存成绩'}</small>`;}
+    if(this.game.over&&!this.recorded&&this.game.mergeAge>=mergeDuration){const r=this.store();this.result.hidden=false;this.result.innerHTML=`<b>${this.game.won&&this.id!=='merge'?'完成':'本局结束'}</b><span>${this.game.score} 分${r?.record?' · 新纪录':''}</span><small>${r?.saved?'已保存':'未能保存'}</small>`;}
     if(this.game.score!==this.score||['pairs','bricks','blocks','falling'].includes(this.id)){
-      this.score=this.game.score;this.status.innerHTML=`<small>本局得分</small><strong>${this.score}</strong><span>最佳 ${this.best??'—'}</span><small>${this.id==='blocks'?`消除 ${this.game.lines} 行 · ${(1/blockInterval(this.game.time,this.game.lines,this.game.pieces)).toFixed(1)} 格/秒`:this.id==='bricks'?`${this.game.lives} 次机会 · 第 ${this.game.rows} 排 · 球速 ${(this.game.ballSpeed/.6).toFixed(1)}×`:this.id==='pairs'?`翻牌 ${this.game.flips} 次 · 每张 −5 分`:this.game.falling?`已投 ${this.game.falling.drops} 颗 · 最大 ${orbNames[this.game.falling.highest]}<br>下一颗 ${orbNames[this.game.falling.next[0]]} · 随后 ${orbNames[this.game.falling.next[1]]}`:this.id==='merge'&&this.game.won?'已达 2048 · 继续挑战更大数字':''}</small>`;
+      this.score=this.game.score;this.status.innerHTML=`<small>得分</small><strong>${this.score}</strong><span>最佳 ${this.best??'—'}</span><small>${this.id==='blocks'?`已消除 ${this.game.lines} 行`:this.id==='bricks'?`${this.game.lives} 次机会 · 球速 ${(this.game.ballSpeed/.6).toFixed(1)}×`:this.id==='pairs'?`翻牌 ${this.game.flips} 次 · 每次 −5 分`:this.game.falling?`最大 ${orbNames[this.game.falling.highest]}<br>接下来 ${orbNames[this.game.falling.next[0]]} → ${orbNames[this.game.falling.next[1]]}`:this.id==='merge'&&this.game.won?'已达 2048':''}</small>`;
     }
     this.draw();
   };
@@ -94,17 +94,19 @@ export class ArcadeRoom{
       const game=g.falling;
       c.strokeStyle='#ad9b7d';c.lineWidth=3;c.beginPath();c.moveTo(.07*w,.22*w);c.lineTo(.07*w,.94*w);c.quadraticCurveTo(.5*w,.96*w,.93*w,.94*w);c.lineTo(.93*w,.22*w);c.stroke();
       c.strokeStyle=game.overflow>0?'#bd6e58':'#ceb9a1';c.setLineDash([5,7]);c.beginPath();c.moveTo(.085*w,.20*w);c.lineTo(.915*w,.20*w);c.stroke();c.setLineDash([]);
-      const orb=(x:number,y:number,r:number,level:number,scale=1)=>{
+      const orb=(x:number,y:number,r:number,level:number,scale=1,squash=0)=>{
         r*=scale;const px=x*w,py=y*w,radius=r*w;
-        c.fillStyle=colors[1+level%7];c.beginPath();c.arc(px,py,radius,0,Math.PI*2);c.fill();
-        c.strokeStyle='#796c5355';c.lineWidth=1.3;c.stroke();c.fillStyle='#fff7e8a0';c.beginPath();c.ellipse(px-radius*.28,py-radius*.32,radius*.26,radius*.14,-.4,0,Math.PI*2);c.fill();
-        c.fillStyle='#494332';c.textAlign='center';c.textBaseline='middle';c.font=`500 ${Math.max(12,radius*.77)}px "Songti SC",serif`;c.fillText(orbNames[level],px,py+radius*.12);
+        c.save();c.translate(px,py);c.scale(1+squash,1-squash);
+        c.fillStyle=colors[1+level%7];c.beginPath();c.arc(0,0,radius,0,Math.PI*2);c.fill();
+        c.strokeStyle='#796c5355';c.lineWidth=1.3;c.stroke();c.fillStyle='#fff7e8a0';c.beginPath();c.ellipse(-radius*.28,-radius*.32,radius*.26,radius*.14,-.4,0,Math.PI*2);c.fill();
+        c.fillStyle='#494332';c.textAlign='center';c.textBaseline='middle';c.font=`500 ${Math.max(12,radius*.77)}px "Songti SC",serif`;c.fillText(orbNames[level],0,radius*.12);c.restore();
       };
-      for(const b of game.balls)orb(b.x,b.y,b.r,b.level,matchMedia('(prefers-reduced-motion: reduce)').matches?1:1+.07*Math.max(0,1-b.wait/.08)*Math.sin(b.wait/.08*Math.PI));
+      const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+      for(const b of game.balls)orb(b.x,b.y,b.r,b.level,reduced?1:1+.07*Math.max(0,1-b.wait/.08)*Math.sin(b.wait/.08*Math.PI),reduced?0:b.pulse);
       const radius=orbRadii[game.next[0]],aim=Math.max(.07+radius,Math.min(.93-radius,game.aim));
       c.globalAlpha=game.ready?1:.45;orb(aim,.085,radius,game.next[0]);c.globalAlpha=1;
       c.strokeStyle='#9b886e66';c.setLineDash([3,6]);c.beginPath();c.moveTo(aim*w,(.085+radius)*w);c.lineTo(aim*w,.91*w);c.stroke();c.setLineDash([]);
-      if(!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const e of game.effects){c.strokeStyle=`rgba(181,135,65,${1-e.age/.3})`;c.lineWidth=2;c.beginPath();c.arc(e.x*w,e.y*w,e.r*w*(1+e.age*2),0,Math.PI*2);c.stroke();}
+      if(!reduced)for(const e of game.effects){c.strokeStyle=`rgba(181,135,65,${(1-e.age/.3)*(e.kind==='hit'?.65:1)})`;c.lineWidth=e.kind==='hit'?2:3;c.beginPath();c.arc(e.x*w,e.y*w,e.r*w*(1+e.age*3),0,Math.PI*2);c.stroke();}
     }else{
       for(const b of g.bricks){c.fillStyle=colors[b.tone];c.beginPath();c.roundRect(b.x*480,b.y*480,.11*480,.036*480,3);c.fill();}
       c.strokeStyle='#b87865';c.setLineDash([5,5]);c.beginPath();c.moveTo(12,.8*480);c.lineTo(468,.8*480);c.stroke();c.setLineDash([]);
@@ -112,7 +114,7 @@ export class ArcadeRoom{
       c.fillStyle='#ba785a';c.beginPath();c.arc(g.ball.x*480,g.ball.y*480,7,0,Math.PI*2);c.fill();
       if(g.serving){c.fillStyle='#6a6255';c.textAlign='center';c.font='18px sans-serif';c.fillText('空格 / 点击画面发球',240,300);}
     }
-    if(this.paused){c.fillStyle='#f3eddfdf';c.fillRect(0,0,w,w);c.fillStyle='#514c42';c.textAlign='center';c.font='28px serif';c.fillText('暂停 · 喝一口热茶',240,240);}
+    if(this.paused){c.fillStyle='#f3eddfdf';c.fillRect(0,0,w,w);c.fillStyle='#514c42';c.textAlign='center';c.font='28px serif';c.fillText('已暂停',240,240);}
   }
   get snapshot(){return {id:this.id,score:this.game.score,over:this.game.over,paused:this.paused,won:this.game.won,lines:this.game.lines,moves:this.game.moves,time:this.game.time,piece:{x:this.game.px,y:this.game.py},paddle:this.game.paddle,flips:this.game.flips,rows:this.game.rows,rowProgress:this.game.rowTravel,ballSpeed:this.game.ballSpeed,ball:{...this.game.ball},snake:this.game.snake.map(p=>({...p})),mergeAge:this.game.mergeAge,board:this.game.board,falling:this.game.falling?{drops:this.game.falling.drops,highest:this.game.falling.highest,next:[...this.game.falling.next],balls:this.game.falling.balls.map(b=>({...b})),cooldown:this.game.falling.cooldown,overflow:this.game.falling.overflow}:null};}
   dispose(){this.store();cancelAnimationFrame(this.frame);this.events.abort();}

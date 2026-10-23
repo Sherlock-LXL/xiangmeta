@@ -1,12 +1,12 @@
 import {clamp} from './seasonal-games.mjs';
 import {FallingMerge} from './falling-merge.mjs';
 export const arcadeCatalog=[
-  {id:'blocks',name:'雪花方块',symbol:'▦',hint:'← → 移动 · ↑ 旋转 · ↓ 加速 · 空格落底',detail:'让一行落满，雪花便会消融。'},
-  {id:'snake',name:'春芽贪吃蛇',symbol:'⌁',hint:'方向键转向 · 吃春芽得分 · 小心自己的尾巴',detail:'春芽连成一路，慢慢长大。'},
-  {id:'bricks',name:'无尽潮汐',symbol:'▤',hint:'← → / 拖动挡板 · 空格发球 · 别让砖块抵达红线',detail:'球速渐快，新砖不断落下，能守住多久？'},
-  {id:'merge',name:'秋色 2048',symbol:'◇',hint:'方向键 / 滑动合并相同数字',detail:'从 2 开始，让秋色层层相叠。'},
-  {id:'pairs',name:'四季翻翻乐',symbol:'✿',hint:'每翻一张扣 5 分 · 配对加 100 分 · 完成再加 400 分',detail:'用更少的翻牌，记住四季的位置。'},
-  {id:'falling',name:'四季叠叠球',symbol:'◉',hint:'移动选落点，点击 / 松手投球 · 相同小球碰到就合成',detail:'把小小的四季，叠成一颗太阳。'},
+  {id:'blocks',name:'雪花方块',symbol:'▦',hint:'← → 移动 · ↑ 旋转 · ↓ 加速 · 空格落下',detail:'填满一行就能消除。'},
+  {id:'snake',name:'春芽贪吃蛇',symbol:'⌁',hint:'方向键转向',detail:'吃春芽，别咬到自己。'},
+  {id:'bricks',name:'无尽潮汐',symbol:'▤',hint:'拖动或 ← → 移动 · 空格发球',detail:'守住不断下移的砖块。'},
+  {id:'merge',name:'秋色 2048',symbol:'◇',hint:'方向键或滑动',detail:'合并相同数字。'},
+  {id:'pairs',name:'四季翻翻乐',symbol:'✿',hint:'翻开两张，寻找配对',detail:'翻牌越少，得分越高。'},
+  {id:'falling',name:'四季叠叠球',symbol:'◉',hint:'拖动选位置，松手投球',detail:'相同的小球会合成。'},
 ];
 export const arcadeScoreKey=id=>`arcade.${id}${id==='bricks'?'.v3':['blocks','snake','pairs'].includes(id)?'.v2':''}`;
 export const blockInterval=(time,lines,pieces)=>.15+.37*Math.exp(-Math.max(time/45,lines/3,pieces/8)*.16);

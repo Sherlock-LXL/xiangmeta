@@ -1,13 +1,14 @@
 import {advanceWalker,createWalker} from './locomotion.mjs';
 import {groundHeight} from './terrain-height.mjs';
-import {supportedFootprint,bodyFootprint,onGround,overlaps} from './navigation.mjs';
+import {supportedFootprint,onGround,overlaps} from './navigation.mjs';
 import {landPath,seaPath,skyPath,waterClear,waterContact,moveBoat} from './game-routes.mjs';
+import {bikeBody,bikeFootprint,bikeObstruction,bikeMotion} from './bike-contact.mjs';
 
 export const gameCatalog=[
-  {id:'spring',name:'四季环岛骑行',vehicle:'山地摩托',tag:'LAND / 春',color:'#ba685e',description:'穿过四岛与中央枢纽，按住 Shift 漂移入弯。',controls:'W / S 油门与倒车 · A / D 转向 · Shift + 转向 漂移 · 空格 刹车 · E 加速'},
-  {id:'summer',name:'群岛穿桥航线',vehicle:'海滩快艇',tag:'SEA / 夏',color:'#497f7e',description:'绕过四季海岸，穿过石桥拱洞与回旋水道。',controls:'W / S 油门与倒车 · A / D 舵向 · 空格 减速 · Shift 冲浪加速'},
-  {id:'autumn',name:'山海长空巡游',vehicle:'滑翔伞',tag:'SKY / 秋',color:'#aa7b39',description:'高低交错的群岛长航线，掠过秋林与春山。',controls:'W 俯冲 · S 抬升 · A / D 倾斜转弯 · 空格 空气刹车 · 金色气流补充高度'},
-  {id:'winter',name:'雪夜游艺室',vehicle:'六款小游戏',tag:'ARCADE / 冬',color:'#687f9f',description:'围坐一盏暖灯，把下雪的时间交给游戏。',controls:'方向键 / 触屏操作 · P 暂停'},
+  {id:'spring',name:'四季环岛骑行',vehicle:'山地摩托',tag:'春 · 陆地',color:'#ba685e',description:'沿山路与桥梁，环游四岛。',controls:'W / S 油门、倒车 · A / D 转向 · Shift 漂移 · 空格刹车 · E 加速'},
+  {id:'summer',name:'群岛穿桥航线',vehicle:'海滩快艇',tag:'夏 · 海上',color:'#497f7e',description:'绕岛航行，穿过石桥。',controls:'W / S 油门、倒车 · A / D 转向 · 空格刹车 · Shift 加速'},
+  {id:'autumn',name:'山海长空巡游',vehicle:'滑翔伞',tag:'秋 · 空中',color:'#aa7b39',description:'在群岛上空升降、转弯。',controls:'W 俯冲 · S 抬升 · A / D 转向 · 空格减速'},
+  {id:'winter',name:'雪夜游艺室',vehicle:'六款小游戏',tag:'冬 · 游艺室',color:'#687f9f',description:'选个小游戏，玩一会儿。',controls:'方向键操作 · P 暂停'},
 ];
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const angleDiff=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
@@ -72,6 +73,7 @@ export function createVehicle(kind,point){return {...createWalker(point.x,point.
 export const seaClear=waterClear;
 /** Fixed short integration steps preserve grip/collision at both 30 and 120 Hz. */
 export function advanceVehicle(s,input,dt,regions,obstacles,time=0){
+  if(dt<=0)return s;
   const steps=Math.max(1,Math.ceil(clamp(dt,0,.1)*120)),h=clamp(dt,0,.1)/steps;s.hit=false;
   for(let k=0;k<steps;k++){
     const turn=clamp(input.turn||0,-1,1),throttle=clamp(input.throttle||0,-1,1),brake=!!input.brake;
@@ -100,22 +102,25 @@ export function advanceVehicle(s,input,dt,regions,obstacles,time=0){
       s.speed*=Math.exp(-s.drift*.30*h);
       const steer=(bike?2.05+2.9*s.drift:2.25)/(1+Math.abs(s.speed)/(bike?22:36));
       const yaw=s.yaw+turn*steer*(s.speed<-.1?-1:1)*Math.min(1,Math.abs(s.speed)/(bike?1:3))*h;
-      const footprint=bodyFootprint(yaw,.67);
-      if(bike?supportedFootprint(s.x,s.z,regions,.43,footprint)&&
-        !obstacles.some(o=>(o.height??Infinity)>s.y+.55&&footprint.some(p=>overlaps(s.x+p.x,s.z+p.z,o,.43))):
+      const footprint=bikeFootprint(yaw);
+      if(bike?supportedFootprint(s.x,s.z,regions,bikeBody.radius,footprint)&&
+        bikeObstruction(s,s.x,s.z,yaw,obstacles).depth===0:
         waterContact(s.x,s.z,regions,yaw).depth<=waterContact(s.x,s.z,regions,s.yaw).depth+.00001)s.yaw=yaw;
       const grip=bike?14-10*s.drift:4.2,blend=1-Math.exp(-grip*h);
       s.vx+=(Math.sin(s.yaw)*s.speed-s.vx)*blend;s.vz+=(Math.cos(s.yaw)*s.speed-s.vz)*blend;
       const x=s.x,z=s.z,oldY=s.y;
       if(bike){
-        const support=bodyFootprint(s.yaw,.67);
-        advanceWalker(s,{x:s.vx,z:s.vz},h,regions,obstacles,{radius:.43,footprint:support,stepHeight:.55,canEnter:(x,z)=>supportedFootprint(x,z,regions,.43,support)});
+        const support=bikeFootprint(s.yaw),motion=bikeMotion(s,s.vx*h,s.vz*h,regions,obstacles);
+        advanceWalker(s,{x:motion.x/h,z:motion.z/h},h,regions,obstacles.filter(o=>(o.height??Infinity)<=s.y+bikeBody.step),{
+          radius:bikeBody.radius,footprint:support,stepHeight:bikeBody.step,canEnter:(x,z)=>supportedFootprint(x,z,regions,bikeBody.radius,support),
+        });
+        if(motion.hit)s.hit=true;
         const slope=(s.y-oldY)/(Math.abs(s.speed)*h+.001);s.pitch+=(clamp(Math.atan(slope),-.4,.4)-s.pitch)*(1-Math.exp(-h*7));
       }else{
         if(moveBoat(s,s.vx*h,s.vz*h,regions))s.hit=true;
         s.y=seaHeight(s.x,s.z,time);s.pitch=(Math.sin(time*3+s.x*.1)*.035)+Math.abs(s.speed)*.009;
       }
-      if(bike&&Math.hypot(s.x-x,s.z-z)<Math.hypot(s.vx,s.vz)*h*.3&&Math.abs(s.speed)>1){s.speed*=.75;s.vx*=.7;s.vz*=.7;s.hit=true;}
+      if(bike&&Math.hypot(s.x-x,s.z-z)<Math.abs(s.speed)*h*.15)s.speed*=Math.exp(-h*5);
       s.bank+=(-turn*Math.abs(s.speed)*(bike?.026+s.drift*.016:.016)-s.bank)*(1-Math.exp(-h*9));
     }
   }

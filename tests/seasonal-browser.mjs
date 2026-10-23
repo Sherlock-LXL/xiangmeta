@@ -10,6 +10,8 @@ const engine=process.env.GAME_ENGINE==='webkit'?webkit:chromium,browser=await en
 const page=await browser.newPage({viewport:touch?{width:390,height:844}:{width:1440,height:1000},hasTouch:touch,isMobile:touch});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(20000);
 page.on('console',e=>{if(e.type()==='error'||/GL_INVALID|INVALID_OPERATION|WebGL.*warning/i.test(e.text()))errors.push(e.text());});
+page.on('requestfailed',r=>errors.push(`${r.url()}: ${r.failure()?.errorText}`));
+page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
 const inspect=()=>page.evaluate(()=>window.__xiangmetaInspect());
 const frames=async(seconds)=>page.evaluate(seconds=>new Promise(resolve=>{const start=performance.now();const tick=()=>performance.now()-start>seconds*1000?resolve():requestAnimationFrame(tick);requestAnimationFrame(tick);}),seconds);
 // Real pointer input; avoid Playwright's RAF-based stability check on the heavy WebGL scene.
@@ -20,6 +22,27 @@ const click=async(selector)=>{
   await page.mouse.click(b.x+b.width/2,b.y+b.height/2);
 };
 const menu=async()=>{if(touch){await click('#mobile-menu');await page.waitForFunction(()=>Math.abs(document.querySelector('.sidebar').getBoundingClientRect().x)<1);}await click('#seasonal-games');};
+const startingCountdown=async id=>{
+  await page.waitForFunction(()=>document.querySelector('[data-count]')?.textContent==='3');
+  if(touch)await page.waitForFunction(()=>document.querySelector('.sidebar').getBoundingClientRect().right<=0);
+  await page.screenshot({path:out+'/countdown-'+id+'.png'});
+  const start=(await inspect()).games;
+  let gas;
+  if(touch){
+    gas=await page.locator('[data-drive="forward"]').boundingBox();
+    await page.mouse.move(gas.x+gas.width/2,gas.y+gas.height/2);await page.mouse.down();
+  }else await page.keyboard.down('w');
+  await frames(.35);
+  const waiting=(await inspect()).games;
+  assert.ok(waiting.race.countdown>0);
+  assert.equal(waiting.race.elapsed,0,'the starting countdown does not count as race time');
+  assert.equal(waiting.vehicle.x,start.vehicle.x);assert.equal(waiting.vehicle.y,start.vehicle.y);assert.equal(waiting.vehicle.z,start.vehicle.z);
+  if(touch)await page.mouse.up();else await page.keyboard.up('w');
+  await page.waitForFunction(()=>document.querySelector('[data-count]')?.textContent==='2');
+  await page.waitForFunction(()=>document.querySelector('[data-count]')?.textContent==='1');
+  await page.waitForFunction(()=>window.__xiangmetaInspect().games.race?.countdown===0);
+  console.log('starting 3 → 2 → 1',id);
+};
 try{
   await page.goto((process.env.GAME_ORIGIN??'http://127.0.0.1:4191')+'/world/?inspect');
   await page.waitForFunction(()=>window.__xiangmetaInspect?.().calls>0,null,{timeout:90000});
@@ -48,12 +71,24 @@ try{
     await writeFile(out+'/route-simulation.json',JSON.stringify(routes));
   }
   await menu();assert.equal(await page.locator('.seasonal-card').count(),4);await page.screenshot({path:out+'/menu.png'});console.log('menu');
-  await click('[data-start="spring"]');await page.waitForFunction(()=>window.__xiangmetaInspect().games.race?.countdown===0);
+  await click('[data-start="spring"]');await startingCountdown('spring');
   const before=(await inspect()).games.vehicle;
   if(touch){const b=await page.locator('[data-drive="forward"]').boundingBox();await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await frames(1.5);await page.mouse.up();}
   else{await page.keyboard.down('w');await frames(1.5);await page.keyboard.up('w');}
   let s=(await inspect()).games;assert.ok(Math.hypot(s.vehicle.x-before.x,s.vehicle.z-before.z)>.5,'bike moves with real input');
-  await page.screenshot({path:out+'/spring.png'});console.log('spring driven');await click('.game-hud [data-pause]');
+  await page.screenshot({path:out+'/spring.png'});console.log('spring driven');
+  if(touch){const b=await page.locator('[data-drive="forward"]').boundingBox();await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();}
+  else await page.keyboard.down('w');
+  await page.waitForFunction(()=>window.__xiangmetaInspect().games.vehicle.hit===true);
+  if(touch)await page.mouse.up();else await page.keyboard.up('w');
+  const contact=(await inspect()).games.vehicle;
+  if(touch){const b=await page.locator('[data-drive="back"]').boundingBox();await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();}
+  else await page.keyboard.down('s');
+  await page.waitForFunction(p=>{const s=window.__xiangmetaInspect().games.vehicle;return s.speed<-.5&&Math.hypot(s.x-p.x,s.z-p.z)>.75;},contact,{timeout:6000});
+  if(touch)await page.mouse.up();else await page.keyboard.up('s');
+  const reversed=(await inspect()).games.vehicle;
+  assert.ok(Math.hypot(reversed.x-contact.x,reversed.z-contact.z)>.75,'the motorcycle reverses away from the exhibit with real controls');
+  console.log('motorcycle reverses out of contact',Math.hypot(reversed.x-contact.x,reversed.z-contact.z));await click('.game-hud [data-pause]');
   const time=(await inspect()).games.race.elapsed;await frames(.35);assert.equal((await inspect()).games.race.elapsed,time);
   assert.equal(await page.locator('.seasonal-dialog [data-reset]').count(),0);
   await click('[data-resume]');await click('.game-hud [data-reset]');assert.equal((await inspect()).games.race.penalty,5);
@@ -77,6 +112,8 @@ try{
   assert.equal(s.race.elapsed,0);assert.equal(s.race.penalty,0);assert.equal(s.race.leisure,false);assert.ok(s.race.countdown>0);
   await click('.game-hud [data-pause]');await click('[data-exit]');assert.equal((await inspect()).games.vehicle,null);
   for(const id of ['summer','autumn']){
+    await menu();await click(`[data-start="${id}"]`);await startingCountdown(id);
+    await click('.game-hud [data-pause]');await click('[data-exit]');
     await menu();await click(`[data-free="${id}"]`);await frames(.15);
     assert.ok((await page.locator('[data-speed]').textContent()).startsWith('0 km/h'),'countdown speedometer shows the stopped vehicle');
     await page.waitForFunction(()=>window.__xiangmetaInspect().games.race?.countdown===0);
@@ -110,6 +147,6 @@ try{
   await click('[data-close]');assert.equal(await page.locator('.seasonal-dialog').evaluate(d=>d.open),false);
   const best=await page.evaluate(()=>localStorage.getItem('xiangmeta.games.v1.arcade.blocks.v2'));assert.ok(best!==null);
   const horizontal=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);assert.equal(horizontal,false);
-  assert.deepEqual(errors,[]);console.log('PASS individual stalls, ordered guidance, countdown reset, six arcade games, saved record',best);
+  assert.deepEqual(errors,[]);console.log('PASS individual stalls, starting countdowns, ordered guidance, countdown reset, six arcade games, saved record',best);
 }catch(e){await page.screenshot({path:out+'/failure.png'});console.error('page errors',errors);throw e;}
 finally{await browser.close();}

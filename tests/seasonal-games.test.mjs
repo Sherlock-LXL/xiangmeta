@@ -6,6 +6,7 @@ import {Arcade,mergeLine,blockInterval,mergeDuration,arcadeScoreKey} from '../sh
 import {seaPath,waterClear,waterContact} from '../shared/game-routes.mjs';
 import {guidanceWindow,gateVisibility} from '../shared/race-guidance.mjs';
 import {FallingMerge,orbRadii} from '../shared/falling-merge.mjs';
+import {bikeBody,bikeContact,bikeMotion,bikeObstruction} from '../shared/bike-contact.mjs';
 import {seededRandom} from '../shared/living-catalog.mjs';
 const regions=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url))).regions;
 const crossing=g=>[{x:g.x-g.nx*8,y:g.y,z:g.z-g.nz*8},{x:g.x+g.nx*8,y:g.y,z:g.z+g.nz*8}];
@@ -145,9 +146,53 @@ test('releasing boost preserves momentum, depletion waits for release, and the f
   }
   const s=createVehicle('spring',{x:30,y:0,z:0,yaw:0}),world=[{position:[30,0],radius:30}],wall={x:30,z:3,halfX:3,halfZ:.1,radius:0,height:4};
   for(let i=0;i<240;i++)advanceVehicle(s,{throttle:1},1/120,world,[wall]);
-  assert.ok(s.z<1.85,'front wheel stays outside the wall');
+  assert.ok(s.z+bikeBody.length+bikeBody.radius<=2.90001,'front wheel stays outside the wall');
   for(let i=0;i<240;i++)advanceVehicle(s,{throttle:-1},1/120,world,[wall]);
   assert.ok(s.z<-.5,'backing away is always available');
+});
+test('motorcycles slide past boxes, round props and railings without penetrating or losing tangent motion',()=>{
+  const world=[{position:[70,30],radius:100}];
+  for(const obstacle of [
+    {x:70,z:34,halfX:5,halfZ:.1,radius:0,height:3},
+    {x:70,z:34,radius:2,height:3},
+    {x:70,z:34,radius:.1,height:3,segment:[65,34,75,34]},
+  ]){
+    const s=createVehicle('spring',{x:70,y:0,z:30,yaw:.4});let first=null;
+    for(let i=0;i<360;i++){
+      advanceVehicle(s,{throttle:1},1/120,world,[obstacle]);
+      if(s.hit)first??={x:s.x,z:s.z};
+      assert.ok(bikeContact(s.x,s.z,s.y,s.yaw,[obstacle]).depth<.00001);
+    }
+    assert.ok(first,'the test reaches the obstacle');
+    assert.ok(s.x-first.x>4&&s.z>37,'glancing contact continues around the obstacle');
+    assert.ok(s.speed>5,'contact preserves useful momentum');
+  }
+});
+test('motorcycles can reverse out of an existing wall or moving-animal overlap',()=>{
+  const world=[{position:[70,30],radius:100}];
+  for(const obstacle of [
+    {x:70,z:30.8,halfX:1,halfZ:.1,radius:0,height:3},
+    {x:70,z:30.8,radius:.55,height:1.8,base:0,dynamic:true},
+  ]){
+    const s=createVehicle('spring',{x:70,y:0,z:30,yaw:0});
+    assert.ok(bikeContact(s.x,s.z,s.y,s.yaw,[obstacle]).depth>.2);
+    for(let i=0;i<150;i++)advanceVehicle(s,{throttle:-1},1/120,world,[obstacle]);
+    assert.ok(s.z<28);assert.equal(bikeContact(s.x,s.z,s.y,s.yaw,[obstacle]).depth,0);
+    assert.equal(s.y,0,'contact does not push the rider onto the model');
+  }
+});
+test('escaping an animal beside a wall preserves movement without borrowing clearance through the wall',()=>{
+  const world=[{position:[70,30],radius:100}],s=createVehicle('spring',{x:70,y:0,z:30,yaw:0});
+  const wall={x:69.5,z:30,halfX:.1,halfZ:3,radius:0,height:3},animal={x:70.35,z:30,radius:.6,height:1.8,dynamic:true};
+  s.vx=-1;s.vz=1;
+  const before=bikeContact(s.x,s.z,s.y,s.yaw,[animal]).depth;
+  assert.ok(before>.5);assert.equal(bikeContact(s.x,s.z,s.y,s.yaw,[wall]).depth,0);
+  assert.ok(bikeObstruction(s,s.x,s.z,-.15,[wall,animal]).depth>0,'turning does not put the front wheel through the wall');
+  const motion=bikeMotion(s,-.08,.06,world,[wall,animal]);s.x+=motion.x;s.z+=motion.z;
+  assert.ok(motion.z>.05,'the rider can still slide along the wall');
+  assert.equal(bikeContact(s.x,s.z,s.y,s.yaw,[wall]).depth,0);
+  assert.ok(bikeContact(s.x,s.z,s.y,s.yaw,[animal]).depth<before);
+  assert.equal(s.vx,0,'only inward velocity is removed');
 });
 test('snake buffers two quick corners and rejects a reversal against the queued turn',()=>{
   const g=new Arcade('snake');g.action('up');g.action('left');g.action('down');
@@ -205,6 +250,23 @@ test('falling balls merge in chains, respect drop cooldown and settle without tu
   assert.equal(g.over,false);assert.ok(g.highest>=4);assert.ok(g.balls.length<5);assert.ok(g.score>0);
   for(const b of g.balls){assert.ok(b.x-b.r>=.07&&b.x+b.r<=.93);assert.ok(b.y+b.r<=.940001);}
   const before=JSON.stringify(g);g.update(0);assert.equal(JSON.stringify(g),before);
+});
+test('falling balls reach the floor promptly and show a short, settling impact bounce',()=>{
+  for(const dt of [1/120,1/30,.1]){
+    const g=new FallingMerge(()=>0);g.drop();let time=0;
+    while(time<1&&!g.effects.some(e=>e.kind==='hit')){g.update(dt);time+=dt;}
+    assert.ok(time<.7,'a fresh ball falls in under 700 ms');
+    const ball=g.balls[0];assert.ok(ball.vy<-.3,'floor impact produces a visible rebound');
+    assert.ok(ball.pulse>.04,'impact compresses the rendered ball');
+    assert.equal(g.ready,true,'the next drop is ready before landing');
+    for(let i=0;i<Math.ceil(3/dt);i++)g.update(dt);
+    assert.ok(Math.abs(ball.vy)<.1&&ball.pulse<.001,'the bounce quickly settles');
+    assert.ok(ball.y+ball.r<=.940001,'faster falling does not tunnel through the floor');
+  }
+  const g=new FallingMerge(()=>0),a=g.make(0,.5,.55,0,1.4),b=g.make(1,.5,.62);
+  a.wait=b.wait=0;g.balls.push(a,b);g.update(1/120);
+  assert.ok(b.vy>a.vy,'unlike balls rebound from each other');
+  assert.ok(a.pulse>.04&&b.pulse>.04,'both balls show contact feedback');
 });
 test('the largest falling circles remain stable and a pile above the limit ends after a grace period',()=>{
   const g=new FallingMerge(()=>0),r=orbRadii.at(-1);

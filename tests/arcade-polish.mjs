@@ -32,7 +32,12 @@ try{
   await page.mouse.up();assert.ok((await read()).rows>4);await click('.seasonal-dialog [data-pause]');await page.screenshot({path:out+'/endless-wave.png'});
   await click('[data-back]');await click('[data-game="falling"]');await page.waitForFunction(()=>window.__xiangmetaInspect().games.arcade?.id==='falling');
   const bowl=await page.locator('.arcade-stage canvas').boundingBox();
-  for(let i=0;i<14;i++){
+  const dropTime=(await read()).time;
+  await page.mouse.click(bowl.x+bowl.width*.5,bowl.y+bowl.height*.1);
+  await page.waitForFunction(()=>window.__xiangmetaInspect().games.arcade.falling.balls.some(b=>b.pulse>.04&&b.vy<-.3));
+  const impact=await read();assert.ok(impact.time-dropTime<.85,'a real drop lands promptly and rebounds');
+  await page.screenshot({path:out+'/falling-impact.png'});
+  for(let i=1;i<14;i++){
     await page.waitForFunction(()=>window.__xiangmetaInspect().games.arcade.falling.cooldown===0);
     const state=await read(),x=.24+state.falling.next[0]*.26;
     await page.mouse.click(bowl.x+bowl.width*x,bowl.y+bowl.height*.1);

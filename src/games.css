@@ -20,13 +20,21 @@
 .seasonal-card button:first-child{background:var(--game-accent);color:#fff9eb;border-color:transparent}
 .seasonal-detail{padding:28px}
 .seasonal-detail>p{min-height:0;margin:22px 0;line-height:2}
-.game-course-facts{display:flex;flex-wrap:wrap;gap:12px 24px;font-size:13px;margin:18px 0}
+.seasonal-detail>.game-course-facts{display:flex;flex-wrap:wrap;gap:12px 24px;font-size:13px;margin:0}
 .seasonal-detail>div:last-child{max-width:440px}
 .seasonal-detail+.game-menu-actions button{background:#fff9ed;color:#5c594e}
 .seasonal-dialog .arcade-menu+.game-menu-actions button{background:#fff9ed;color:#5c594e}
 .game-footnote{font-size:11px;line-height:1.8;color:#827866;margin:20px 0 0}
 .game-menu-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
 .game-menu-actions button:first-child{background:#527b70;color:#fff6e7}
+.game-menu-actions [data-all-games]{background:#fff9ed!important;color:#5c594e!important}
+.game-control-notes{font-size:12px;color:#736959;margin:16px 0}
+.game-control-notes summary,.game-drive-help summary{cursor:pointer;list-style:none}
+.game-control-notes summary::before,.game-drive-help summary::before{content:'⌨ ';color:#7b8c7e}
+.game-control-notes summary::after,.game-drive-help summary::after{content:' ▾';color:#8b806a}
+.game-control-notes[open] summary::after,.game-drive-help[open] summary::after{content:' ▴'}
+.game-control-notes p,.game-drive-help p{margin:10px 0;line-height:1.8}
+.game-control-notes small{line-height:1.8}
 .game-finish{display:flex;flex-direction:column;gap:10px;align-items:center;padding:30px 0;border-block:1px solid #dbd1bd}
 .game-finish strong{font:50px/1.1 Georgia,serif;font-variant-numeric:tabular-nums;color:#957037}
 .game-finish>span{font:19px "Songti SC",serif}
@@ -34,7 +42,7 @@
 .seasonal-dialog.game-result-dialog{width:min(480px,calc(100vw - 28px));margin:auto 20px 20px auto;padding:24px}
 .seasonal-dialog.game-result-dialog::backdrop{background:#263f3a13;backdrop-filter:none}
 .game-near-prompt{position:absolute;left:50%;bottom:130px;transform:translateX(-50%);z-index:15;white-space:nowrap;box-shadow:0 6px 24px #403b2320;font-size:13px;background:#f7efdc}
-.game-near-prompt[hidden],.game-hud[hidden],.arcade-result[hidden],.arcade-pad[hidden],.arcade-cards[hidden],.game-boost[hidden]{display:none!important}
+.game-near-prompt[hidden],.game-hud[hidden],.arcade-result[hidden],.arcade-pad[hidden],.arcade-cards[hidden],.game-boost[hidden],.game-countdown[hidden]{display:none!important}
 .main-world.game-active .interaction-prompt,.main-world.game-active .crosshair,.main-world.game-active .touch-controls,.main-world.game-active .game-near-prompt,.main-world.game-active .world-label,.main-world.game-active #trail-guide,.main-world.game-active .world-heading,.main-world.game-active .guide-card{display:none!important}
 .main-world.game-driving .mini-atlas,.main-world.game-driving .world-bottom,.main-world.game-driving .world-meta,.main-world.game-driving .view-badge,.main-world.game-driving .compass,.main-world.game-driving .music-caption{display:none!important}
 .game-hud{position:absolute;inset:0;z-index:18;pointer-events:none;color:#39362d}
@@ -51,9 +59,11 @@
 .game-navigation>span{grid-row:span 2;font:25px Georgia,serif;color:#a56f3e}
 .game-navigation b{font-size:12px;font-weight:500;white-space:nowrap;grid-column:2}
 .game-navigation small{font-size:10px;color:#8a775a;white-space:nowrap;grid-column:2}
-.game-countdown{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);font:80px "Songti SC",serif;color:#fff1ce;text-shadow:0 4px 24px #4b4c36}
+.game-countdown{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);width:154px;min-height:154px;border:1px solid #cfb985;border-radius:50%;background:#f6efdfef;box-shadow:0 8px 32px #54462925;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#866335}
+.game-countdown small{font-size:11px;letter-spacing:2px}
+.game-countdown b{font:68px/1 "Songti SC",serif;font-weight:400}
 .game-route-map{position:absolute;right:20px;bottom:24px;border:1px solid #cec2a9;border-radius:10px;background:#f6efdfeb;overflow:hidden;line-height:0}
-.game-drive-help{position:absolute;bottom:27px;left:20px;max-width:calc(100% - 220px);font-size:11px;line-height:1.9;padding:10px 14px;border-radius:8px;background:#f6efdfeb;color:#6e624f}
+.game-drive-help{position:absolute;bottom:27px;left:20px;max-width:calc(100% - 220px);font-size:11px;line-height:1.9;padding:10px 14px;border-radius:8px;background:#f6efdfeb;color:#6e624f;pointer-events:auto}
 .game-touch-drive{display:none;position:absolute;bottom:max(20px,env(safe-area-inset-bottom));left:14px;right:14px;justify-content:space-between;gap:16px}
 .game-touch-drive>div{display:flex;align-items:end;gap:7px}
 .game-touch-drive>div:last-child{justify-content:flex-end;flex-wrap:wrap;max-width:calc(100% - 108px)}
@@ -85,6 +95,7 @@
 .arcade-result{position:absolute;inset:25% 8%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;border:1px solid #c9b797;border-radius:12px;background:#f6eeddeF;box-shadow:0 8px 30px #55442825}
 .arcade-result b{font:26px "Songti SC",serif}.arcade-result span{font-size:16px}.arcade-result small{font-size:11px;color:#86755a}
 @media (pointer:coarse){.game-touch-drive{display:flex}.game-drive-help{display:none}.game-route-map{bottom:100px;right:14px;transform:scale(.8);transform-origin:bottom right}.game-near-prompt{bottom:160px}}
+@media (pointer:coarse){.arcade-side>small{display:none}}
 @media(max-width:640px){
   .seasonal-dialog{padding:20px 17px;width:calc(100vw - 18px);max-height:calc(100dvh - 18px);border-radius:12px}
   .seasonal-dialog h2{font-size:27px}.game-description{font-size:12px;margin-bottom:18px}

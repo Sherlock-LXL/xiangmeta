@@ -89,7 +89,7 @@ export class SeasonalGames{
     this.dialog.scrollTop=0;
     this.mark();this.dialog.querySelector<HTMLButtonElement>('button')?.focus();
   }
-  private heading(tag:string,title:string,description:string){return `<div class="game-dialog-head"><span class="game-eyebrow">${tag}</span><button data-close aria-label="关闭四季游乐">×</button></div><h2>${title}</h2><p class="game-description">${description}</p>`;}
+  private heading(tag:string,title:string,description=''){return `<div class="game-dialog-head"><span class="game-eyebrow">${tag}</span><button data-close aria-label="关闭四季游乐">×</button></div><h2>${title}</h2>${description?`<p class="game-description">${description}</p>`:''}`;}
   open(id?:string){
     if(this.busy)return;this.loading++;this.hooks.lock();
     if(id){this.stallPage(id);return;}this.allGames();
@@ -98,14 +98,14 @@ export class SeasonalGames{
     if(id==='winter'){this.arcadeMenu();return;}
     const spec=gameCatalog.find(s=>s.id===id)!,course=this.courses.get(id)!;
     const best=readBest(this.storage,`race.${id}.${course.version}`);
-    this.show(this.heading(spec.tag,spec.name,spec.description)+`<article class="seasonal-card seasonal-detail" data-stall-page="${id}" style="--game-accent:${spec.color}"><span>${spec.vehicle}</span><div class="game-course-facts"><span>${Math.round(course.length)} m / 圈</span><span>${course.laps} 圈挑战</span><span>个人最佳 ${formatTime(best??Infinity)}</span></div><p>${spec.controls}</p><div><button data-start="${id}">计时挑战</button><button data-free="${id}">自由漫游</button></div></article><div class="game-menu-actions"><button data-all-games>查看所有游戏</button></div>`);
+    this.show(this.heading(spec.tag,spec.name,spec.description)+`<article class="seasonal-card seasonal-detail" data-stall-page="${id}" style="--game-accent:${spec.color}"><div class="game-course-facts"><span>${Math.round(course.length)} m / 圈</span><span>${course.laps} 圈</span><span>最佳 ${formatTime(best??Infinity)}</span></div><details class="game-control-notes"><summary>操作</summary><p>${spec.controls}</p><small>R 复位（罚时 5 秒） · Esc 暂停<br>金牌 ${formatTime(course.medals[0])} · 银牌 ${formatTime(course.medals[1])}</small></details><div><button data-start="${id}">计时挑战</button><button data-free="${id}">自由漫游</button></div></article><div class="game-menu-actions"><button data-all-games>所有游戏</button></div>`);
     this.wireMenu();
   }
   private allGames(){
-    this.show(this.heading('FOUR SEASONS / 玩在山海之间','四季游乐','一条山径，一片海，一阵风，还有一间温暖的游艺室。')+`<div class="seasonal-cards">${gameCatalog.map(s=>{
+    this.show(this.heading('四季游乐','选个游戏')+`<div class="seasonal-cards">${gameCatalog.map(s=>{
       const course=this.courses.get(s.id),best=course?readBest(this.storage,`race.${s.id}.${course.version}`):null;
       return `<article class="seasonal-card" style="--game-accent:${s.color}"><span>${s.tag}</span><h3>${s.name}</h3><p>${s.description}</p><small>${s.vehicle}${course?` · ${Math.round(course.length)} m / 圈 · 两圈 · 最佳 ${formatTime(best??Infinity)}`:` · ${arcadeCatalog.length} 款 · 本地纪录`}</small><div>${course?`<button data-start="${s.id}">计时挑战</button><button data-free="${s.id}">自由漫游</button>`:'<button data-arcade>进入游艺室</button>'}</div></article>`;
-    }).join('')}</div><p class="game-footnote">按顺序穿过信标，完成两圈。R 复位，每次罚时 5 秒。</p>`);
+    }).join('')}</div>`);
     this.wireMenu();
   }
   private wireMenu(){
@@ -117,7 +117,7 @@ export class SeasonalGames{
   private close(){this.loading++;this.arc?.dispose();this.arc=undefined;this.dialog.close();this.mark();if(this.returnFocus?.isConnected)this.returnFocus.focus({preventScroll:true});}
   private arcadeMenu(){
     this.loading++;this.arc?.dispose();this.arc=undefined;
-    this.show(this.heading('WINTER / 雪夜游艺室','留一局给冬天','选择一台街机，开始这一局。')+`<div class="arcade-menu" data-stall-page="winter">${arcadeCatalog.map(g=>`<button data-game="${g.id}"><i>${g.symbol}</i><span><b>${g.name}</b><small>${g.detail}</small><em>最佳 ${readBest(this.storage,arcadeScoreKey(g.id))??'—'} 分</em></span><span>→</span></button>`).join('')}</div><div class="game-menu-actions"><button data-all-games>查看所有游戏</button></div>`);
+    this.show(this.heading('冬','雪夜游艺室')+`<div class="arcade-menu" data-stall-page="winter">${arcadeCatalog.map(g=>`<button data-game="${g.id}"><i>${g.symbol}</i><span><b>${g.name}</b><small>${g.detail}</small><em>最佳 ${readBest(this.storage,arcadeScoreKey(g.id))??'—'} 分</em></span><span>→</span></button>`).join('')}</div><div class="game-menu-actions"><button data-all-games>所有游戏</button></div>`);
     this.wireMenu();
     this.dialog.querySelectorAll<HTMLButtonElement>('[data-game]').forEach(b=>b.onclick=async()=>{
       const request=++this.loading;b.disabled=true;
@@ -130,12 +130,12 @@ export class SeasonalGames{
     const stall=this.stalls.find(s=>s.id===id)!;
     this.hooks.arrive(stall.approach.x,stall.approach.z,stall.x,stall.z);
     this.race=createRace(this.courses.get(id)!,leisure);this.vehicle=createVehicle(id,this.race.course.spawn);
-    this.lastFrame=performance.now();
+    this.lastFrame=0;
     this.rig=gameVehicle(id);this.scene.add(this.rig.root);this.cameraReady=false;this.paused=false;this.close();this.buildRoute();
     this.trail=new T.InstancedMesh(new T.SphereGeometry(1,6,4),new T.MeshBasicMaterial({color:id==='spring'?'#d3b994':id==='summer'?'#e9f4e9':'#f0d999',transparent:true,opacity:.65,depthWrite:false}),80);
     this.trail.frustumCulled=false;this.scene.add(this.trail);this.trailSamples=Array.from({length:80},()=>({x:0,y:-50,z:0,age:10,side:0}));this.trailCursor=0;this.trailClock=0;
     const spec=gameCatalog.find(s=>s.id===id)!;
-    this.hud.innerHTML=`<div class="game-instruments"><div><small>${spec.tag} / ${leisure?'自由漫游':'两圈挑战'}</small><b>${spec.name}</b></div><strong data-time>00:00.00</strong><span data-lap></span><span data-speed></span><div class="game-boost"><i></i></div><button data-pause aria-label="暂停游戏">Ⅱ</button></div><div class="game-navigation"><span data-direction>◇</span><b data-target></b><small data-notice></small></div><div class="game-countdown" aria-live="polite"></div><div class="game-route-map"><canvas width="170" height="140" aria-label="赛道与当前位置"></canvas></div><div class="game-drive-help">${spec.controls}<br>R 复位${leisure?'':' +5 秒'} · P / Esc 暂停</div><div class="game-touch-drive" aria-label="载具触屏控制"><div><button data-drive="left" aria-label="向左转">←</button><button data-drive="right" aria-label="向右转">→</button></div><div><button data-drive="brake">刹车</button>${id==='autumn'?'<button data-drive="back">抬升</button><button data-drive="forward">俯冲</button>':'<button data-drive="boost">冲刺</button><button data-drive="back">倒车</button><button data-drive="forward">油门</button>'}</div></div>`;
+    this.hud.innerHTML=`<div class="game-instruments"><div><small>${spec.tag} · ${leisure?'自由漫游':'计时挑战'}</small><b>${spec.name}</b></div><strong data-time>00:00.00</strong><span data-lap></span><span data-speed></span><div class="game-boost"><i></i></div><button data-pause aria-label="暂停游戏">Ⅱ</button></div><div class="game-navigation"><span data-direction>◇</span><b data-target></b><small data-notice></small></div><div class="game-countdown" role="status" aria-live="polite"><small data-count-label>准备出发</small><b data-count>3</b></div><div class="game-route-map"><canvas width="170" height="140" aria-label="赛道与当前位置"></canvas></div><details class="game-drive-help"><summary>操作</summary><p>${spec.controls}</p><small>R 复位${leisure?'':' +5 秒'} · Esc 暂停</small></details><div class="game-touch-drive" aria-label="载具触屏控制"><div><button data-drive="left" aria-label="向左转">←</button><button data-drive="right" aria-label="向右转">→</button></div><div><button data-drive="brake">刹车</button>${id==='autumn'?'<button data-drive="back">抬升</button><button data-drive="forward">俯冲</button>':'<button data-drive="boost">加速</button><button data-drive="back">倒车</button><button data-drive="forward">油门</button>'}</div></div>`;
     this.hud.querySelector('[data-pause]')!.addEventListener('click',()=>this.pause());
     this.hud.querySelector('[data-pause]')!.insertAdjacentHTML('beforebegin','<button data-reset aria-label="复位到上个信标" title="R · 复位">R</button>');
     this.hud.querySelector('[data-reset]')!.addEventListener('click',()=>this.reset());
@@ -147,7 +147,7 @@ export class SeasonalGames{
       b.addEventListener('pointerdown',e=>{e.preventDefault();if(e.button!==0||this.paused)return;b.setPointerCapture(e.pointerId);this.touch.set(e.pointerId,b.dataset.drive!);});
       const release=(e:PointerEvent)=>this.touch.delete(e.pointerId);b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release);
     });
-    this.hud.hidden=false;this.mark();this.hooks.sound();
+    this.hud.hidden=false;this.updateHud();this.mark();this.hooks.sound();
   }
   private buildRoute(){
     this.clearRoute();if(!this.race)return;
@@ -171,11 +171,11 @@ export class SeasonalGames{
   }
   private reset(){
     if(!this.vehicle||!this.race||this.paused||this.race.finished||this.race.countdown>0)return;
-    this.vehicle=createVehicle(this.vehicle.kind,resetRaceVehicle(this.race));this.lastFrame=performance.now();this.cameraReady=false;this.clearInput();this.updateHud();
+    this.vehicle=createVehicle(this.vehicle.kind,resetRaceVehicle(this.race));this.lastFrame=0;this.cameraReady=false;this.clearInput();this.updateHud();
   }
   private pause(){
     if(!this.vehicle||this.race?.finished)return;this.paused=true;
-    this.show(this.heading('TAKE A BREATH / 暂停','在这里歇一会儿','回来后继续这一圈。')+'<div class="game-menu-actions"><button data-resume>继续游玩</button><button data-restart>重新游玩</button><button data-exit>结束并回到摊位</button></div>');
+    this.show(this.heading('游戏','已暂停')+'<div class="game-menu-actions"><button data-resume>继续</button><button data-restart>重新开始</button><button data-exit>回到摊位</button></div>');
     this.dialog.querySelector('[data-close]')!.addEventListener('click',()=>this.resume());this.dialog.querySelector('[data-resume]')!.addEventListener('click',()=>this.resume());
     this.dialog.querySelector('[data-restart]')!.addEventListener('click',()=>{const id=this.vehicle!.kind,leisure=this.race!.leisure;this.stop();this.start(id,leisure);});this.dialog.querySelector('[data-exit]')!.addEventListener('click',()=>this.stop());
   }
@@ -189,8 +189,8 @@ export class SeasonalGames{
   }
   private finish(){
     const race=this.race!,grade=raceGrade(race),total=race.elapsed+race.penalty;
-    const result=saveBest(this.storage,`race.${race.course.id}.${race.course.version}`,total,true),labels={gold:'流光冠军',silver:'星芒骑士',bronze:'完赛留念'};
-    this.celebrate(grade);this.show(this.heading('FINISH / 把这一刻收藏',labels[grade],grade==='gold'?'烟花为你升起。山海记住了这一圈。':grade==='silver'?'一束星芒，送给漂亮的发挥。':'每一次出发，都比上一次更熟悉风。')+`<div class="game-finish" data-grade="${grade}"><strong>${formatTime(total)}</strong><span>${result.record?'✦ 新的个人纪录':'个人最佳 '+formatTime(result.best??Infinity)}</span><small>两圈完成 · 原始用时 ${formatTime(race.elapsed)} · 复位罚时 ${race.penalty} 秒</small><small>${result.saved?'已保存在此浏览器':'此浏览器暂时无法保存成绩'}</small></div><div class="game-menu-actions"><button data-again>再来一局</button><button data-roam>自由漫游</button><button data-exit>回到摊位</button></div>`);
+    const result=saveBest(this.storage,`race.${race.course.id}.${race.course.version}`,total,true),labels={gold:'金牌',silver:'银牌',bronze:'完成比赛'};
+    this.celebrate(grade);this.show(this.heading('成绩',labels[grade])+`<div class="game-finish" data-grade="${grade}"><strong>${formatTime(total)}</strong><span>${result.record?'新纪录':'最佳 '+formatTime(result.best??Infinity)}</span><small>用时 ${formatTime(race.elapsed)} · 罚时 ${race.penalty} 秒</small><small>${result.saved?'已保存':'未能保存'}</small></div><div class="game-menu-actions"><button data-again>再来一局</button><button data-roam>自由漫游</button><button data-exit>回到摊位</button></div>`);
     this.dialog.classList.add('game-result-dialog');
     this.dialog.querySelector('[data-close]')!.addEventListener('click',()=>this.stop());
     for(const key of ['again','roam'])this.dialog.querySelector(`[data-${key}]`)!.addEventListener('click',()=>{const id=race.course.id;this.stop();this.start(id,key==='roam');});
@@ -229,7 +229,7 @@ export class SeasonalGames{
     });this.trail.instanceMatrix.needsUpdate=true;
   }
   update(dt:number,player:Point,camera:T.PerspectiveCamera,available:boolean,externalPaused:boolean,reduced:boolean){
-    const now=performance.now(),raceDelta=Math.max(0,(now-this.lastFrame)/1000);this.lastFrame=now;
+    const now=performance.now(),raceDelta=this.lastFrame?Math.max(0,(now-this.lastFrame)/1000):0;this.lastFrame=now;
     this.blocked=!available;this.time+=dt;
     if(!this.busy){
       const near=available?this.stalls.find(s=>Math.hypot(player.x-s.x,player.z-s.z)<3.5&&Math.abs(player.y-s.y)<1):undefined;
@@ -242,12 +242,12 @@ export class SeasonalGames{
     const input={throttle:Number(pressed('forward','KeyW','ArrowUp'))-Number(pressed('back','KeyS','ArrowDown')),turn:Number(pressed('left','KeyA','ArrowLeft'))-Number(pressed('right','KeyD','ArrowRight')),brake:pressed('brake','Space'),drift:s.kind==='spring'&&pressed('drift','ShiftLeft','ShiftRight'),boost:s.kind==='spring'?pressed('boost','KeyE'):pressed('boost','ShiftLeft','ShiftRight')};
     if(canMove){
       if(race.countdown<=0)advanceVehicle(s,input,dt,this.data.regions,[...this.navigation.nearby(s.x,s.z,7),...(s.kind==='spring'?this.hooks.dynamic():[])],this.time);
-      const passed=advanceRace(race,previous,s,raceDelta);if(passed)this.hooks.sound();
+      const passed=advanceRace(race,previous,s,race.countdown>0?Math.min(.1,raceDelta):raceDelta);if(passed)this.hooks.sound();
       if(s.kind==='autumn'&&s.hit&&!race.finished){this.reset();this.updateHud();return;}
       if(race.finished)this.finish();
     }
     const visualY=s.y+s.stepOffset;
-    this.rig.root.position.set(s.x,visualY,s.z);this.rig.root.rotation.y=s.yaw;this.rig.animate(s.speed,reduced?0:s.bank,s.pitch,canMove?dt:0);
+    this.rig.root.position.set(s.x,visualY,s.z);this.rig.root.rotation.y=s.yaw;this.rig.animate(s.speed,reduced||s.hit?0:s.bank,s.pitch,canMove?dt:0,canMove?input.turn:0);
     this.updateTrail(canMove&&race.countdown<=0?dt:0,reduced);
     const distance=s.kind==='autumn'?10:s.kind==='summer'?8:5,height=s.kind==='autumn'?4:s.kind==='summer'?3.7:2.8;
     const target=new T.Vector3(s.x-Math.sin(s.yaw)*distance,visualY+height,s.z-Math.cos(s.yaw)*distance);
@@ -285,10 +285,11 @@ export class SeasonalGames{
     this.hud.querySelector('[data-lap]')!.textContent=race.leisure?'随风而行':`${race.lap} / ${race.course.laps} 圈`;
     this.hud.querySelector('[data-speed]')!.textContent=`${Math.round((race.countdown>0?0:Math.abs(s.speed))*3.6)} km/h${s.kind==='autumn'?` · ${Math.round(s.y+5.65)} m`:''}`;
     this.hud.querySelector<HTMLElement>('.game-boost')!.hidden=s.kind==='autumn';this.hud.querySelector<HTMLElement>('.game-boost i')!.style.width=`${s.boost*100}%`;
-    const countdown=this.hud.querySelector<HTMLElement>('.game-countdown')!;const text=race.countdown>0?String(Math.ceil(race.countdown)):race.elapsed<.7?'出发':'';if(countdown.textContent!==text)countdown.textContent=text;
+    const countdown=this.hud.querySelector<HTMLElement>('.game-countdown')!,text=race.countdown>0?String(Math.ceil(race.countdown)):race.elapsed<.6?'出发':'';
+    countdown.hidden=!text;countdown.querySelector('[data-count]')!.textContent=text;countdown.querySelector<HTMLElement>('[data-count-label]')!.hidden=race.countdown<=0;
     this.hud.querySelector('[data-target]')!.textContent=race.leisure?s.kind==='autumn'?'寻找金色上升气流':s.kind==='summer'?'随海风远行':'随心骑行':`信标 ${race.next+1} / ${race.course.gates.length} · ${Math.round(distance)} m`;
     const arrow=this.hud.querySelector<HTMLElement>('[data-direction]')!;arrow.hidden=race.leisure;arrow.textContent='↑';arrow.style.transform=`rotate(${-angleDiff(s.yaw,Math.atan2(g.x-s.x,g.z-s.z))}rad)`;
-    this.hud.querySelector('[data-notice]')!.textContent=s.hit?s.kind==='summer'?'前方近岸，减速转向 · R 可复位':'前方有障碍，倒车或转向 · R 可复位':race.leisure?'P / Ⅱ 暂停与返回':`依序通过 · ${race.penalty?`罚时 +${race.penalty}s · `:''}金 ${formatTime(race.course.medals[0])} / 银 ${formatTime(race.course.medals[1])}`;
+    this.hud.querySelector('[data-notice]')!.textContent=s.hit?'倒车或转向离开':race.leisure?'Esc 暂停':race.penalty?`罚时 +${race.penalty} 秒`:'按顺序通过';
     const canvas=this.hud.querySelector<HTMLCanvasElement>('canvas')!,ctx=canvas.getContext('2d')!,points=race.course.path;
     ctx.clearRect(0,0,170,140);
     if(race.leisure){ctx.fillStyle='#746956';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('自由漫游',85,64);ctx.fillText('P / Ⅱ 返回摊位',85,86);return;}

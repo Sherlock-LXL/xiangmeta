@@ -13,26 +13,40 @@ const box=(g:T.Object3D,w:number,h:number,d:number,mat:T.Material,x=0,y=0,z=0)=>
 export function gameVehicle(kind:string,rider=true){
   const root=new T.Group(),body=new T.Group();root.add(body);root.name='game-vehicle-'+kind;
   const wheels:T.Object3D[]=[],paint=material(kind==='spring'?'#a95c52':kind==='summer'?'#528b84':'#d4aa64',.72,0);
+  let bikeFrame:T.Group|undefined,front:T.Group|undefined,pilot:T.Group|undefined;
   if(kind==='spring'){
-    for(const z of [-.72,.76]){
-      const wheel=new T.Group();wheel.position.set(0,.36,z);body.add(wheel);wheels.push(wheel);
-      const tire=mesh(wheel,new T.TorusGeometry(.29,.085,10,24),kit.ink());tire.rotation.y=Math.PI/2;
-      const hub=mesh(wheel,new T.CylinderGeometry(.07,.07,.24,12),kit.bronze());hub.rotation.z=Math.PI/2;
-      for(let i=0;i<8;i++){const a=i*Math.PI/4;rod(wheel,[0,0,0],[0,Math.sin(a)*.26,Math.cos(a)*.26],.012,kit.marble());}
+    bikeFrame=new T.Group();bikeFrame.name='motorcycle-frame';body.add(bikeFrame);
+    for(const z of [-.62,.64]){
+      const axle=new T.Group();axle.position.set(0,.345,z);body.add(axle);if(z>0){front=axle;axle.name='motorcycle-steering';}
+      const wheel=new T.Group();axle.add(wheel);wheels.push(wheel);
+      const tire=mesh(wheel,new T.TorusGeometry(.27,.075,12,28),kit.ink());tire.rotation.y=Math.PI/2;
+      const rim=mesh(wheel,new T.TorusGeometry(.22,.023,6,24),kit.bronze());rim.rotation.y=Math.PI/2;
+      const hub=mesh(wheel,new T.CylinderGeometry(.07,.07,.18,12),kit.bronze());hub.rotation.z=Math.PI/2;
+      for(let i=0;i<10;i++){const a=i*Math.PI/5;rod(wheel,[0,0,0],[0,Math.sin(a)*.21,Math.cos(a)*.21],.010,kit.marble());}
+      for(const side of [-1,1]){
+        const disc=mesh(wheel,new T.CylinderGeometry(.14,.14,.015,16),kit.stoneDark(),side*.065);disc.rotation.z=Math.PI/2;
+      }
     }
+    const frame=bikeFrame;
     for(const s of [-1,1]){
-      rod(body,[s*.12,.36,-.72],[s*.12,.72,.02],.045,kit.bronze());
-      rod(body,[s*.12,.72,.02],[s*.12,.35,.76],.045,kit.bronze());
-      rod(body,[s*.12,.38,.76],[s*.12,1.12,.55],.04,kit.marble());
-      rod(body,[s*.12,.38,-.72],[s*.12,.78,-.32],.035,kit.marble());
+      rod(frame,[s*.10,.345,-.62],[s*.12,.70,.02],.035,kit.bronze());
+      rod(frame,[s*.12,.70,.02],[s*.10,.36,.64],.035,kit.bronze());
+      rod(frame,[s*.12,.70,.02],[s*.12,.83,-.34],.04,paint);
+      rod(body,[s*.10,.36,.64],[s*.12,1.06,.43],.038,kit.marble());
+      rod(body,[s*.12,1.06,.43],[s*.12,1.12,.40],.030,kit.bronze());
+      rod(frame,[s*.14,.38,-.58],[s*.14,.82,-.25],.03,kit.marble());
+      for(let i=0;i<5;i++)mesh(frame,new T.TorusGeometry(.042,.012,5,12),kit.bronze(),s*.14,.49+i*.055,-.45+i*.027).rotation.x=Math.PI/2;
     }
-    box(body,.40,.27,.60,paint,0,.82,.16);box(body,.36,.12,.68,kit.ink(),0,.91,-.3);
-    box(body,.22,.29,.30,kit.stoneDark(),0,.50,-.04);
-    rod(body,[-.40,1.14,.56],[.40,1.14,.56],.034,kit.ink());
-    for(const z of [-.74,.80])box(body,.26,.055,.43,paint,0,.75,z);
-    const light=mesh(body,new T.SphereGeometry(.105,12,8),kit.lamp(),0,.96,.77);light.scale.z=.4;
-    rod(body,[.22,.50,-.20],[.24,.46,-.76],.065,kit.bronze());
-    for(const s of [-1,1])rod(body,[0,.48,-.12],[s*.29,.48,-.12],.04,kit.ink());
+    const tank=box(frame,.37,.25,.48,paint,0,.81,.12);tank.rotation.x=-.12;
+    box(frame,.32,.10,.55,kit.ink(),0,.92,-.22);
+    const engine=box(frame,.27,.27,.33,kit.stoneDark(),0,.54,-.05);engine.name='motorcycle-engine';
+    for(let i=0;i<4;i++)box(frame,.30,.025,.33,kit.bronze(),0,.47+i*.053,-.05);
+    rod(body,[-.32,1.12,.40],[.32,1.12,.40],.025,kit.ink());
+    for(const z of [-.63,.66])box(frame,.24,.055,.35,paint,0,.72,z);
+    const light=mesh(frame,new T.SphereGeometry(.10,14,10),kit.lamp(),0,.94,.55);light.scale.z=.38;
+    rod(frame,[.19,.52,-.12],[.20,.46,-.58],.054,kit.bronze());
+    for(const s of [-1,1])rod(frame,[s*.12,.51,-.1],[s*.26,.51,-.1],.025,kit.ink());
+    const chain=mesh(frame,new T.TorusGeometry(.11,.018,5,20),kit.timber(),-.11,.36,-.53);chain.rotation.y=Math.PI/2;
   }else if(kind==='summer'){
     const hull=new T.Shape();hull.moveTo(0,1.8);hull.bezierCurveTo(.58,1.5,.82,.45,.76,-1.45);hull.lineTo(-.76,-1.45);hull.bezierCurveTo(-.82,.45,-.58,1.5,0,1.8);
     const geo=new T.ExtrudeGeometry(hull,{depth:.38,bevelEnabled:true,bevelSize:.12,bevelThickness:.12,bevelSegments:2,steps:1,curveSegments:12});
@@ -62,17 +76,26 @@ export function gameVehicle(kind:string,rider=true){
     for(const s of [-1,1])rod(body,[s*.23,.30,-.3],[s*.24,.94,.05],.025,kit.bronze());
   }
   if(rider){
-    const pilot=new T.Group();body.add(pilot);pilot.position.set(kind==='summer'?-.30:0,kind==='spring'?.98:kind==='summer'?.50:.42,kind==='spring'?-.28:kind==='summer'?-.50:0);
+    pilot=new T.Group();body.add(pilot);pilot.position.set(kind==='summer'?-.30:0,kind==='spring'?.95:kind==='summer'?.50:.42,kind==='spring'?-.22:kind==='summer'?-.50:0);
     const coat=mesh(pilot,new T.SphereGeometry(1,12,10),kit.paper(),0,.25,0);coat.scale.set(.19,.30,.15);coat.rotation.x=.18;
-    mesh(pilot,new T.SphereGeometry(.18,16,10),kit.ink(),0,.63,.08);
-    const visor=mesh(pilot,new T.SphereGeometry(.15,12,8),kit.celadon(),0,.63,.18);visor.scale.set(1,.60,.50);
+    mesh(pilot,new T.SphereGeometry(.18,16,10),kind==='spring'?paint:kit.ink(),0,.63,.08);
+    const visor=mesh(pilot,new T.SphereGeometry(.15,12,8),kit.celadon(),0,.63,kind==='spring'?.24:.18);visor.scale.set(1,.60,.50);
     for(const s of [-1,1]){
-      rod(pilot,[s*.16,.40,.04],[s*.30,kind==='autumn'?.65:.19,.37],.055,kit.paper());
+      const reach=kind==='spring'?.62:.37;
+      rod(pilot,[s*.16,.40,.04],[s*.25,.27,reach*.55],.055,kit.paper());
+      rod(pilot,[s*.25,.27,reach*.55],[s*.30,kind==='autumn'?.65:.17,reach],.048,kit.paper());
+      mesh(pilot,new T.SphereGeometry(.055,10,6),kit.ink(),s*.30,kind==='autumn'?.65:.17,reach);
       rod(pilot,[s*.13,.06,0],[s*.24,-.20,.20],.06,kit.timber());
       rod(pilot,[s*.24,-.20,.20],[s*.24,-.42,.12],.05,kit.ink());
     }
   }
-  return {root,animate:(speed:number,bank:number,pitch:number,dt:number)=>{body.rotation.set(-pitch,0,bank,'YXZ');wheels.forEach(w=>w.rotation.x+=speed*dt/.36);}};
+  return {root,animate:(speed:number,bank:number,pitch:number,dt:number,steer=0)=>{
+    body.rotation.set(-pitch,0,kind==='spring'?0:bank,'YXZ');
+    if(bikeFrame)bikeFrame.rotation.z=T.MathUtils.clamp(bank,-.20,.20);
+    if(front)front.rotation.y=steer*.35;
+    if(pilot&&kind==='spring')pilot.rotation.z=bank*.15;
+    wheels.forEach(w=>w.rotation.x+=speed*dt/(kind==='spring'?.345:.36));
+  }};
 }
 export function gameStall(id:string,title:string,color:string){
   const root=new T.Group();root.name='seasonal-stall-'+id;
