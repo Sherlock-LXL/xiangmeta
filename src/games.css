@@ -18,6 +18,12 @@
 .seasonal-card>div{display:flex;gap:8px;margin-top:19px}
 .seasonal-card button{font-size:12px;flex:1;padding:9px 6px}
 .seasonal-card button:first-child{background:var(--game-accent);color:#fff9eb;border-color:transparent}
+.seasonal-detail{padding:28px}
+.seasonal-detail>p{min-height:0;margin:22px 0;line-height:2}
+.game-course-facts{display:flex;flex-wrap:wrap;gap:12px 24px;font-size:13px;margin:18px 0}
+.seasonal-detail>div:last-child{max-width:440px}
+.seasonal-detail+.game-menu-actions button{background:#fff9ed;color:#5c594e}
+.seasonal-dialog .arcade-menu+.game-menu-actions button{background:#fff9ed;color:#5c594e}
 .game-footnote{font-size:11px;line-height:1.8;color:#827866;margin:20px 0 0}
 .game-menu-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
 .game-menu-actions button:first-child{background:#527b70;color:#fff6e7}

@@ -1,12 +1,14 @@
 import {clamp} from './seasonal-games.mjs';
+import {FallingMerge} from './falling-merge.mjs';
 export const arcadeCatalog=[
   {id:'blocks',name:'雪花方块',symbol:'▦',hint:'← → 移动 · ↑ 旋转 · ↓ 加速 · 空格落底',detail:'让一行落满，雪花便会消融。'},
-  {id:'snake',name:'春芽贪吃蛇',symbol:'⌁',hint:'方向键转弯 · 穿过边缘从对侧出现 · 避开自己',detail:'绕过边界，拾起更多春芽。'},
+  {id:'snake',name:'春芽贪吃蛇',symbol:'⌁',hint:'方向键转向 · 吃春芽得分 · 小心自己的尾巴',detail:'春芽连成一路，慢慢长大。'},
   {id:'bricks',name:'无尽潮汐',symbol:'▤',hint:'← → / 拖动挡板 · 空格发球 · 别让砖块抵达红线',detail:'球速渐快，新砖不断落下，能守住多久？'},
   {id:'merge',name:'秋色 2048',symbol:'◇',hint:'方向键 / 滑动合并相同数字',detail:'从 2 开始，让秋色层层相叠。'},
   {id:'pairs',name:'四季翻翻乐',symbol:'✿',hint:'每翻一张扣 5 分 · 配对加 100 分 · 完成再加 400 分',detail:'用更少的翻牌，记住四季的位置。'},
+  {id:'falling',name:'四季叠叠球',symbol:'◉',hint:'移动选落点，点击 / 松手投球 · 相同小球碰到就合成',detail:'把小小的四季，叠成一颗太阳。'},
 ];
-export const arcadeScoreKey=id=>`arcade.${id}${['blocks','snake','bricks','pairs'].includes(id)?'.v2':''}`;
+export const arcadeScoreKey=id=>`arcade.${id}${id==='bricks'?'.v3':['blocks','snake','pairs'].includes(id)?'.v2':''}`;
 export const blockInterval=(time,lines,pieces)=>.15+.37*Math.exp(-Math.max(time/45,lines/3,pieces/8)*.16);
 export const mergeDuration=.12;
 const shapes=[[[1,1,1,1]],[[2,2],[2,2]],[[0,3,0],[3,3,3]],[[0,4,4],[4,4,0]],[[5,5,0],[0,5,5]],[[6,0,0],[6,6,6]],[[0,0,7],[7,7,7]]];
@@ -20,6 +22,7 @@ export function mergeLine(line){
 export class Arcade{
   constructor(kind,random=Math.random){
     this.kind=kind;this.random=random;this.score=0;this.over=false;this.won=false;this.time=0;this.tick=0;
+    this.falling=kind==='falling'?new FallingMerge(random):null;
     /** @type {number[][]} */ this.board=[];
     /** @type {number[]} */ this.bag=[];
     /** @type {number[][]} */ this.shape=[];
@@ -28,9 +31,9 @@ export class Arcade{
     this.snake=[{x:7,y:8},{x:6,y:8},{x:5,y:8}];this.dir={x:1,y:0};this.queued={x:1,y:0};this.food={x:11,y:8};
     /** @type {{x:number;y:number}[]} */ this.turns=[];
     this.paddle=.5;this.ball={x:.5,y:.83,vx:.3,vy:-.52};this.serving=true;this.lives=3;this.axis=0;
-    /** @type {{x:number;y:number;tone:number}[]} */ this.bricks=[];
+    /** @type {{x:number;y:number;tone:number;row:number}[]} */ this.bricks=[];
     this.activeTime=0;this.hits=0;this.rowTravel=0;this.rows=4;
-    for(let row=0;row<4;row++)for(let col=0;col<8;col++)this.bricks.push({x:col*.116+.037,y:.1+row*.048,tone:row%6+1});
+    for(let row=0;row<4;row++)for(let col=0;col<8;col++)this.bricks.push({x:col*.116+.037,y:.1+row*.048,tone:row%6+1,row});
     /** @type {{fromX:number;fromY:number;x:number;y:number;value:number}[]} */ this.tiles=[];
     /** @type {{x:number;y:number}[]} */ this.merges=[];
     /** @type {{x:number;y:number}|null} */ this.newTile=null;
@@ -61,13 +64,23 @@ export class Arcade{
   get ballSpeed(){return Math.min(1.5,.60+.65*(1-Math.exp(-this.activeTime/130))+Math.min(.25,this.hits*.003));}
   get rowInterval(){return 8+8*Math.exp(-this.activeTime/150);}
   addBrickRow(){
+    const shift=this.bricks.length?Math.max(0,.148-Math.min(...this.bricks.map(b=>b.y))):0;
+    if(shift)this.bricks.forEach(b=>b.y+=shift);
     const gap=Math.floor(this.random()*8);
-    for(let col=0;col<8;col++)if(col!==gap)this.bricks.push({x:col*.116+.037,y:.1,tone:this.rows%6+1});
-    this.rows++;
+    for(let col=0;col<8;col++)if(col!==gap)this.bricks.push({x:col*.116+.037,y:.1,tone:this.rows%6+1,row:this.rows});
+    this.rows++;this.rowTravel=0;
+  }
+  hitBrick(index){
+    const [brick]=this.bricks.splice(index,1);this.hits++;this.score+=25;
+    if(!this.bricks.some(b=>b.row===brick.row))this.addBrickRow();
   }
   action(key){
     if(this.over)return;
-    if(this.kind==='blocks'){
+    if(this.falling){
+      if(key==='left')this.falling.aim=clamp(this.falling.aim-.05,.1,.9);
+      if(key==='right')this.falling.aim=clamp(this.falling.aim+.05,.1,.9);
+      if(key==='space')this.falling.drop();
+    }else if(this.kind==='blocks'){
       if(key==='left'&&this.fits(this.shape,this.px-1))this.px--;
       if(key==='right'&&this.fits(this.shape,this.px+1))this.px++;
       if(key==='up'){const rotated=this.shape[0].map((_,i)=>this.shape.map(r=>r[i]).reverse());for(const shift of [0,-1,1,-2,2])if(this.fits(rotated,this.px+shift)){this.shape=rotated;this.px+=shift;break;}}
@@ -115,6 +128,7 @@ export class Arcade{
     dt=clamp(dt,0,.1);
     if(this.kind==='merge'){this.mergeAge=Math.min(mergeDuration,this.mergeAge+dt);if(!this.over&&this.mergeAge>=mergeDuration&&this.mergeQueue.length)this.action(this.mergeQueue.shift());}
     if(this.over)return;this.time+=dt;this.tick+=dt;
+    if(this.falling){this.falling.aim=clamp(this.falling.aim+this.axis*dt*.7,.1,.9);this.falling.update(dt);this.score=this.falling.score;this.over=this.falling.over;return;}
     if(this.kind==='blocks'&&this.tick>=blockInterval(this.time,this.lines,this.pieces)){this.tick=0;this.drop();}
     if(this.kind==='snake'&&this.tick>=Math.max(.065,.17-this.score*.00012)){
       this.tick=0;this.dir=this.turns.shift()??this.dir;const head={x:(this.snake[0].x+this.dir.x+16)%16,y:(this.snake[0].y+this.dir.y+16)%16},eat=head.x===this.food.x&&head.y===this.food.y;
@@ -129,7 +143,7 @@ export class Arcade{
       if(this.serving){this.ball.x=this.paddle;this.ball.y=.84;return;}
       this.activeTime+=dt;
       const descend=.048/this.rowInterval*dt;this.rowTravel+=descend;this.bricks.forEach(b=>b.y+=descend);
-      if(this.rowTravel>=.048||!this.bricks.length){this.rowTravel=0;this.addBrickRow();}
+      if(this.rowTravel>=.048||!this.bricks.length)this.addBrickRow();
       if(this.bricks.some(b=>b.y+.036>=.80)){this.over=true;return;}
       const n=Math.ceil(dt*240),h=dt/n,b=this.ball;
       const speed=this.ballSpeed,length=Math.hypot(b.vx,b.vy)||1;b.vx*=speed/length;b.vy*=speed/length;
@@ -140,7 +154,7 @@ export class Arcade{
         for(let i=0;i<this.bricks.length;i++){
           const {x,y}=this.bricks[i];
           if(b.x>x-.015&&b.x<x+.11+.015&&b.y>y-.015&&b.y<y+.036+.015){
-            this.bricks.splice(i,1);this.hits++;this.score+=25;if(oldX<=x-.015||oldX>=x+.125)b.vx*=-1;else b.vy*=-1;break;
+            this.hitBrick(i);if(oldX<=x-.015||oldX>=x+.125)b.vx*=-1;else b.vy*=-1;break;
           }
         }
         if(b.y>1.03){this.lives--;if(!this.lives)this.over=true;else{this.serving=true;this.ball={x:this.paddle,y:.84,vx:.3,vy:-.52};}break;}

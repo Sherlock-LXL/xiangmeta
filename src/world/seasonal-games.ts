@@ -9,6 +9,8 @@ import {groundHeight} from '../../shared/terrain-height.mjs';
 import {onGround,overlaps} from '../../shared/navigation.mjs';
 import {gameStall,gameVehicle,releaseGameObject} from './game-models';
 import {batchStatic} from './optimizer';
+import {gateVisibility,guidanceWindow} from '../../shared/race-guidance.mjs';
+import {RouteGuide} from './route-guide';
 import type {ArcadeRoom} from './arcade-room';
 import '../games.css';
 
@@ -22,6 +24,7 @@ export class SeasonalGames{
   private events=new AbortController();private keys=new Set<string>();private touch=new Map<number,string>();private arc?:ArcadeRoom;
   private race:ReturnType<typeof createRace>|null=null;private vehicle:ReturnType<typeof createVehicle>|null=null;private rig:ReturnType<typeof gameVehicle>|null=null;
   private routeRoot=new T.Group();private gateMeshes:T.Mesh[]=[];
+  private routeGuide=new RouteGuide();
   private effects?:T.Points;private particles:number[]=[];private effectTime=0;private effectKind='bronze';
   private trail?:T.InstancedMesh;private trailSamples:{x:number;y:number;z:number;age:number;side:number}[]=[];private trailCursor=0;private trailClock=0;private transform=new T.Object3D();
   private paused=false;private near:Stall|null=null;private time=0;private uiTime=0;private cameraReady=false;private loading=0;
@@ -57,7 +60,7 @@ export class SeasonalGames{
     this.navigation=new LivingNavigation(data.regions,obstacles);
     this.prompt.className='game-near-prompt';this.prompt.hidden=true;this.prompt.onclick=()=>{if(this.near)this.open(this.near.id);};host.append(this.prompt);
     this.dialog.className='seasonal-dialog';this.dialog.setAttribute('aria-label','四季游乐');document.body.append(this.dialog);
-    this.hud.className='game-hud';this.hud.hidden=true;host.append(this.hud);this.scene.add(this.routeRoot);
+    this.hud.className='game-hud';this.hud.hidden=true;host.append(this.hud);this.scene.add(this.routeRoot,this.routeGuide.root);this.routeGuide.root.visible=false;
     const opts={signal:this.events.signal};
     this.dialog.addEventListener('cancel',e=>{e.preventDefault();if(this.arc){this.arcadeMenu();return;}if(this.vehicle&&this.race?.finished)this.stop();else if(this.vehicle)this.resume();else this.close();},opts);
     window.addEventListener('keydown',e=>{
@@ -80,7 +83,7 @@ export class SeasonalGames{
   private clearInput(){this.keys.clear();this.touch.clear();}
   private mark(){this.host.closest('.main-world')?.classList.toggle('game-active',this.busy);this.host.closest('.main-world')?.classList.toggle('game-driving',this.driving);this.prompt.hidden=this.busy||!this.near;}
   private show(content:string){
-    this.hooks.lock();this.clearInput();this.dialog.innerHTML=content;
+    this.loading++;this.hooks.lock();this.clearInput();this.dialog.innerHTML=content;
     this.dialog.classList.remove('game-result-dialog');
     if(!this.dialog.open){this.returnFocus=document.activeElement as HTMLElement;this.dialog.showModal();}
     this.dialog.scrollTop=0;
@@ -89,19 +92,33 @@ export class SeasonalGames{
   private heading(tag:string,title:string,description:string){return `<div class="game-dialog-head"><span class="game-eyebrow">${tag}</span><button data-close aria-label="关闭四季游乐">×</button></div><h2>${title}</h2><p class="game-description">${description}</p>`;}
   open(id?:string){
     if(this.busy)return;this.loading++;this.hooks.lock();
+    if(id){this.stallPage(id);return;}this.allGames();
+  }
+  private stallPage(id:string){
+    if(id==='winter'){this.arcadeMenu();return;}
+    const spec=gameCatalog.find(s=>s.id===id)!,course=this.courses.get(id)!;
+    const best=readBest(this.storage,`race.${id}.${course.version}`);
+    this.show(this.heading(spec.tag,spec.name,spec.description)+`<article class="seasonal-card seasonal-detail" data-stall-page="${id}" style="--game-accent:${spec.color}"><span>${spec.vehicle}</span><div class="game-course-facts"><span>${Math.round(course.length)} m / 圈</span><span>${course.laps} 圈挑战</span><span>个人最佳 ${formatTime(best??Infinity)}</span></div><p>${spec.controls}</p><div><button data-start="${id}">计时挑战</button><button data-free="${id}">自由漫游</button></div></article><div class="game-menu-actions"><button data-all-games>查看所有游戏</button></div>`);
+    this.wireMenu();
+  }
+  private allGames(){
     this.show(this.heading('FOUR SEASONS / 玩在山海之间','四季游乐','一条山径，一片海，一阵风，还有一间温暖的游艺室。')+`<div class="seasonal-cards">${gameCatalog.map(s=>{
       const course=this.courses.get(s.id),best=course?readBest(this.storage,`race.${s.id}.${course.version}`):null;
-      return `<article class="seasonal-card${id===s.id?' current':''}" style="--game-accent:${s.color}"><span>${s.tag}</span><h3>${s.name}</h3><p>${s.description}</p><small>${s.vehicle}${course?` · ${Math.round(course.length)} m / 圈 · 两圈 · 最佳 ${formatTime(best??Infinity)}`:' · 5 款 · 本地纪录'}</small><div>${course?`<button data-start="${s.id}">计时挑战</button><button data-free="${s.id}">自由漫游</button>`:'<button data-arcade>进入游艺室</button>'}</div></article>`;
-    }).join('')}</div><p class="game-footnote">靠近岛上的游乐摊位，按 V 也能开始。挑战按顺序穿过信标，两圈结束；R 复位加 5 秒。</p>`);
-    this.dialog.querySelector('[data-close]')!.addEventListener('click',()=>this.close());
+      return `<article class="seasonal-card" style="--game-accent:${s.color}"><span>${s.tag}</span><h3>${s.name}</h3><p>${s.description}</p><small>${s.vehicle}${course?` · ${Math.round(course.length)} m / 圈 · 两圈 · 最佳 ${formatTime(best??Infinity)}`:` · ${arcadeCatalog.length} 款 · 本地纪录`}</small><div>${course?`<button data-start="${s.id}">计时挑战</button><button data-free="${s.id}">自由漫游</button>`:'<button data-arcade>进入游艺室</button>'}</div></article>`;
+    }).join('')}</div><p class="game-footnote">按顺序穿过信标，完成两圈。R 复位，每次罚时 5 秒。</p>`);
+    this.wireMenu();
+  }
+  private wireMenu(){
+    this.dialog.querySelector('[data-close]')?.addEventListener('click',()=>this.close());
+    this.dialog.querySelector('[data-all-games]')?.addEventListener('click',()=>this.allGames());
     this.dialog.querySelectorAll<HTMLButtonElement>('[data-start],[data-free]').forEach(b=>b.onclick=()=>this.start(b.dataset.start??b.dataset.free!,!!b.dataset.free));
-    this.dialog.querySelector('[data-arcade]')!.addEventListener('click',()=>this.arcadeMenu());
+    this.dialog.querySelector('[data-arcade]')?.addEventListener('click',()=>this.arcadeMenu());
   }
   private close(){this.loading++;this.arc?.dispose();this.arc=undefined;this.dialog.close();this.mark();if(this.returnFocus?.isConnected)this.returnFocus.focus({preventScroll:true});}
   private arcadeMenu(){
     this.loading++;this.arc?.dispose();this.arc=undefined;
-    this.show(this.heading('WINTER / 雪夜游艺室','留一局给冬天','选择一台街机。所有游戏都支持键盘与触屏。')+`<div class="arcade-menu">${arcadeCatalog.map(g=>`<button data-game="${g.id}"><i>${g.symbol}</i><span><b>${g.name}</b><small>${g.detail}</small><em>最佳 ${readBest(this.storage,arcadeScoreKey(g.id))??'—'} 分</em></span><span>→</span></button>`).join('')}</div>`);
-    this.dialog.querySelector('[data-close]')!.addEventListener('click',()=>this.close());
+    this.show(this.heading('WINTER / 雪夜游艺室','留一局给冬天','选择一台街机，开始这一局。')+`<div class="arcade-menu" data-stall-page="winter">${arcadeCatalog.map(g=>`<button data-game="${g.id}"><i>${g.symbol}</i><span><b>${g.name}</b><small>${g.detail}</small><em>最佳 ${readBest(this.storage,arcadeScoreKey(g.id))??'—'} 分</em></span><span>→</span></button>`).join('')}</div><div class="game-menu-actions"><button data-all-games>查看所有游戏</button></div>`);
+    this.wireMenu();
     this.dialog.querySelectorAll<HTMLButtonElement>('[data-game]').forEach(b=>b.onclick=async()=>{
       const request=++this.loading;b.disabled=true;
       try{const {ArcadeRoom}=await import('./arcade-room');if(request!==this.loading||!this.dialog.open)return;
@@ -120,6 +137,8 @@ export class SeasonalGames{
     const spec=gameCatalog.find(s=>s.id===id)!;
     this.hud.innerHTML=`<div class="game-instruments"><div><small>${spec.tag} / ${leisure?'自由漫游':'两圈挑战'}</small><b>${spec.name}</b></div><strong data-time>00:00.00</strong><span data-lap></span><span data-speed></span><div class="game-boost"><i></i></div><button data-pause aria-label="暂停游戏">Ⅱ</button></div><div class="game-navigation"><span data-direction>◇</span><b data-target></b><small data-notice></small></div><div class="game-countdown" aria-live="polite"></div><div class="game-route-map"><canvas width="170" height="140" aria-label="赛道与当前位置"></canvas></div><div class="game-drive-help">${spec.controls}<br>R 复位${leisure?'':' +5 秒'} · P / Esc 暂停</div><div class="game-touch-drive" aria-label="载具触屏控制"><div><button data-drive="left" aria-label="向左转">←</button><button data-drive="right" aria-label="向右转">→</button></div><div><button data-drive="brake">刹车</button>${id==='autumn'?'<button data-drive="back">抬升</button><button data-drive="forward">俯冲</button>':'<button data-drive="boost">冲刺</button><button data-drive="back">倒车</button><button data-drive="forward">油门</button>'}</div></div>`;
     this.hud.querySelector('[data-pause]')!.addEventListener('click',()=>this.pause());
+    this.hud.querySelector('[data-pause]')!.insertAdjacentHTML('beforebegin','<button data-reset aria-label="复位到上个信标" title="R · 复位">R</button>');
+    this.hud.querySelector('[data-reset]')!.addEventListener('click',()=>this.reset());
     if(id==='spring'){
       const drift=this.hud.querySelector<HTMLButtonElement>('[data-drive="boost"]')!;drift.dataset.drive='drift';drift.textContent='漂移';
       drift.insertAdjacentHTML('afterend','<button data-drive="boost">加速</button>');
@@ -134,30 +153,31 @@ export class SeasonalGames{
     this.clearRoute();if(!this.race)return;
     const {course,leisure}=this.race;
     if(!leisure){
-      const positions=course.path.map(p=>new T.Vector3(p.x,p.y+(course.id==='summer'?.1:.12),p.z));
-      const line=new T.Line(new T.BufferGeometry().setFromPoints(positions),new T.LineBasicMaterial({color:'#b99a5b',transparent:true,opacity:.55}));this.routeRoot.add(line);
       course.gates.forEach((g,i)=>{
         const geo=course.id==='autumn'?new T.TorusGeometry(g.radius,.12,6,48):new T.TorusGeometry(g.radius,.065,6,36,Math.PI);
-        const gate=new T.Mesh(geo,new T.MeshBasicMaterial({color:'#e0c685',transparent:true,opacity:.3}));gate.position.set(g.x,g.y+(course.id==='summer'?.15:0),g.z);gate.rotation.y=Math.atan2(g.nx,g.nz);gate.userData.index=i;this.routeRoot.add(gate);this.gateMeshes.push(gate);
+        const gate=new T.Mesh(geo,new T.MeshBasicMaterial({color:'#e0c685',transparent:true,opacity:0,depthWrite:false}));gate.visible=false;gate.position.set(g.x,g.y+(course.id==='summer'?.15:0),g.z);gate.rotation.y=Math.atan2(g.nx,g.nz);gate.userData.index=i;this.routeRoot.add(gate);this.gateMeshes.push(gate);
       });
     }
     if(course.id==='autumn')for(const t of thermals){
-      for(let i=0;i<3;i++){const ring=new T.Mesh(new T.TorusGeometry(t.radius*(.7+i*.1),.045,5,40),new T.MeshBasicMaterial({color:'#d9bc71',transparent:true,opacity:.34}));ring.rotation.x=Math.PI/2;ring.position.set(t.x,8+i*8,t.z);ring.name='thermal';this.routeRoot.add(ring);}
+      const positions=new Float32Array(30*3);
+      for(let i=0;i<30;i++){const a=i*2.399;positions.set([Math.cos(a)*t.radius*.22,6+i/30*38,Math.sin(a)*t.radius*.22],i*3);}
+      const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.BufferAttribute(positions,3));
+      const gust=new T.Points(geometry,new T.PointsMaterial({color:'#efd291',size:.18,transparent:true,opacity:.58,depthWrite:false}));gust.position.set(t.x,0,t.z);gust.name='thermal';this.routeRoot.add(gust);
     }
   }
   private clearRoute(){
-    this.routeRoot.traverse(o=>{if(o instanceof T.Mesh||o instanceof T.Line){o.geometry.dispose();(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose());}});
-    this.routeRoot.clear();this.gateMeshes=[];
+    this.routeRoot.traverse(o=>{if(o instanceof T.Mesh||o instanceof T.Line||o instanceof T.Points){o.geometry.dispose();(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose());}});
+    this.routeRoot.clear();this.gateMeshes=[];this.routeGuide.reset();
   }
   private reset(){
-    if(!this.vehicle||!this.race||this.paused||this.race.finished)return;
-    this.vehicle=createVehicle(this.vehicle.kind,resetRaceVehicle(this.race));this.cameraReady=false;this.clearInput();
+    if(!this.vehicle||!this.race||this.paused||this.race.finished||this.race.countdown>0)return;
+    this.vehicle=createVehicle(this.vehicle.kind,resetRaceVehicle(this.race));this.lastFrame=performance.now();this.cameraReady=false;this.clearInput();this.updateHud();
   }
   private pause(){
     if(!this.vehicle||this.race?.finished)return;this.paused=true;
-    this.show(this.heading('TAKE A BREATH / 暂停','在这里歇一会儿','计时已暂停。回来后继续这一圈。')+'<div class="game-menu-actions"><button data-resume>继续游玩</button><button data-reset>复位到上个信标</button><button data-exit>结束并回到摊位</button></div>');
+    this.show(this.heading('TAKE A BREATH / 暂停','在这里歇一会儿','回来后继续这一圈。')+'<div class="game-menu-actions"><button data-resume>继续游玩</button><button data-restart>重新游玩</button><button data-exit>结束并回到摊位</button></div>');
     this.dialog.querySelector('[data-close]')!.addEventListener('click',()=>this.resume());this.dialog.querySelector('[data-resume]')!.addEventListener('click',()=>this.resume());
-    this.dialog.querySelector('[data-reset]')!.addEventListener('click',()=>{this.resume();this.reset();});this.dialog.querySelector('[data-exit]')!.addEventListener('click',()=>this.stop());
+    this.dialog.querySelector('[data-restart]')!.addEventListener('click',()=>{const id=this.vehicle!.kind,leisure=this.race!.leisure;this.stop();this.start(id,leisure);});this.dialog.querySelector('[data-exit]')!.addEventListener('click',()=>this.stop());
   }
   private resume(){this.close();this.paused=false;this.lastFrame=performance.now();this.clearInput();}
   stop(){
@@ -239,8 +259,15 @@ export class SeasonalGames{
     }
     if(!this.cameraReady){camera.position.copy(target);this.cameraReady=true;}else camera.position.lerp(target,1-Math.exp(-dt*8));
     camera.lookAt(s.x+Math.sin(s.yaw)*2,visualY+1.1,s.z+Math.cos(s.yaw)*2);
-    this.gateMeshes.forEach((m,i)=>{const active=i===race.next;(m.material as T.MeshBasicMaterial).opacity=active?.95:.22;(m.material as T.MeshBasicMaterial).color.set(active?'#ffcc66':'#91aaa0');});
-    for(const o of this.routeRoot.children)if(o.name==='thermal'&&!reduced)o.rotation.z+=dt*.16;
+    this.routeGuide.update(race,s,canMove&&race.countdown===0?dt:0,reduced);
+    this.gateMeshes.forEach((m,i)=>{const opacity=gateVisibility(race.next,i,race.course.gates.length,race.finished);m.visible=opacity>0;(m.material as T.MeshBasicMaterial).opacity=opacity;(m.material as T.MeshBasicMaterial).color.set(i===race.next?'#ffcc66':'#91aaa0');});
+    for(const o of this.routeRoot.children)if(o.name==='thermal'){
+      o.visible=Math.hypot(o.position.x-s.x,o.position.z-s.z)<22;
+      if(!reduced&&canMove&&o instanceof T.Points){
+        o.rotation.y+=dt*.16;const p=o.geometry.attributes.position;
+        for(let i=0;i<p.count;i++)p.setY(i,6+(p.getY(i)-6+dt*3)%38);p.needsUpdate=true;
+      }
+    }
     if(this.effects){
       this.effectTime+=dt;const positions=this.effects.geometry.attributes.position;
       for(let i=0;i<positions.count;i++){
@@ -254,12 +281,12 @@ export class SeasonalGames{
   }
   private updateHud(){
     const race=this.race!,s=this.vehicle!,g=race.course.gates[race.next],distance=Math.hypot(s.x-g.x,s.z-g.z);
-    this.hud.querySelector('[data-time]')!.textContent=formatTime(race.elapsed+race.penalty);
+    this.hud.querySelector('[data-time]')!.textContent=formatTime(race.elapsed);
     this.hud.querySelector('[data-lap]')!.textContent=race.leisure?'随风而行':`${race.lap} / ${race.course.laps} 圈`;
-    this.hud.querySelector('[data-speed]')!.textContent=`${Math.round(Math.abs(s.speed)*3.6)} km/h${s.kind==='autumn'?` · ${Math.round(s.y+5.65)} m`:''}`;
+    this.hud.querySelector('[data-speed]')!.textContent=`${Math.round((race.countdown>0?0:Math.abs(s.speed))*3.6)} km/h${s.kind==='autumn'?` · ${Math.round(s.y+5.65)} m`:''}`;
     this.hud.querySelector<HTMLElement>('.game-boost')!.hidden=s.kind==='autumn';this.hud.querySelector<HTMLElement>('.game-boost i')!.style.width=`${s.boost*100}%`;
     const countdown=this.hud.querySelector<HTMLElement>('.game-countdown')!;const text=race.countdown>0?String(Math.ceil(race.countdown)):race.elapsed<.7?'出发':'';if(countdown.textContent!==text)countdown.textContent=text;
-    this.hud.querySelector('[data-target]')!.textContent=race.leisure?s.kind==='autumn'?'金色气流可以托起滑翔伞':'自由探索 · 没有指定路线':`信标 ${race.next+1} / ${race.course.gates.length} · ${Math.round(distance)} m`;
+    this.hud.querySelector('[data-target]')!.textContent=race.leisure?s.kind==='autumn'?'寻找金色上升气流':s.kind==='summer'?'随海风远行':'随心骑行':`信标 ${race.next+1} / ${race.course.gates.length} · ${Math.round(distance)} m`;
     const arrow=this.hud.querySelector<HTMLElement>('[data-direction]')!;arrow.hidden=race.leisure;arrow.textContent='↑';arrow.style.transform=`rotate(${-angleDiff(s.yaw,Math.atan2(g.x-s.x,g.z-s.z))}rad)`;
     this.hud.querySelector('[data-notice]')!.textContent=s.hit?s.kind==='summer'?'前方近岸，减速转向 · R 可复位':'前方有障碍，倒车或转向 · R 可复位':race.leisure?'P / Ⅱ 暂停与返回':`依序通过 · ${race.penalty?`罚时 +${race.penalty}s · `:''}金 ${formatTime(race.course.medals[0])} / 银 ${formatTime(race.course.medals[1])}`;
     const canvas=this.hud.querySelector<HTMLCanvasElement>('canvas')!,ctx=canvas.getContext('2d')!,points=race.course.path;
@@ -267,10 +294,11 @@ export class SeasonalGames{
     if(race.leisure){ctx.fillStyle='#746956';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('自由漫游',85,64);ctx.fillText('P / Ⅱ 返回摊位',85,86);return;}
     const xs=points.map(p=>p.x),zs=points.map(p=>p.z),minX=Math.min(...xs),minZ=Math.min(...zs),scale=Math.min(140/(Math.max(...xs)-minX),110/(Math.max(...zs)-minZ));
     const point=(p:{x:number;z:number})=>({x:15+(p.x-minX)*scale,y:15+(p.z-minZ)*scale});
-    ctx.strokeStyle='#a69a80';ctx.lineWidth=2;ctx.beginPath();points.forEach((p,i)=>{const v=point(p);if(i)ctx.lineTo(v.x,v.y);else ctx.moveTo(v.x,v.y);});ctx.stroke();
-    race.course.gates.forEach((p,i)=>{const v=point(p);ctx.fillStyle=i===race.next?'#bf724e':'#999d86';ctx.beginPath();ctx.arc(v.x,v.y,i===race.next?5:2,0,Math.PI*2);ctx.fill();});
+    ctx.globalAlpha=.25;ctx.strokeStyle='#a69a80';ctx.lineWidth=2;ctx.beginPath();points.forEach((p,i)=>{const v=point(p);if(i)ctx.lineTo(v.x,v.y);else ctx.moveTo(v.x,v.y);});ctx.stroke();ctx.globalAlpha=1;
+    const guide=guidanceWindow(race,s);ctx.strokeStyle='#bf724e';ctx.lineWidth=3;ctx.beginPath();guide.forEach((p,i)=>{const v=point(p);if(i)ctx.lineTo(v.x,v.y);else ctx.moveTo(v.x,v.y);});ctx.stroke();
+    race.course.gates.forEach((p,i)=>{const opacity=gateVisibility(race.next,i,race.course.gates.length,race.finished);if(!opacity)return;const v=point(p);ctx.globalAlpha=opacity;ctx.fillStyle=i===race.next?'#bf724e':'#999d86';ctx.beginPath();ctx.arc(v.x,v.y,i===race.next?5:2,0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;
     const v=point(s);ctx.fillStyle='#345f61';ctx.beginPath();ctx.arc(v.x,v.y,4,0,Math.PI*2);ctx.fill();
   }
-  get snapshot(){return {stalls:this.stalls,vehicle:this.vehicle?{...this.vehicle}:null,race:this.race?{...this.race}:null,paused:this.paused,arcade:this.arc?.snapshot??null,near:this.near?.id??null};}
-  dispose(){this.loading++;this.arc?.dispose();this.events.abort();this.clearRoute();this.routeRoot.removeFromParent();this.clearEffects();this.clearTrail();if(this.rig)releaseGameObject(this.rig.root);this.releases.forEach(f=>f());this.roots.forEach(r=>r.removeFromParent());this.dialog.remove();this.hud.remove();this.prompt.remove();}
+  get snapshot(){return {stalls:this.stalls,vehicle:this.vehicle?{...this.vehicle}:null,race:this.race?{...this.race}:null,paused:this.paused,arcade:this.arc?.snapshot??null,near:this.near?.id??null,guide:this.routeGuide.snapshot,gates:this.gateMeshes.filter(m=>m.visible).map(m=>({index:m.userData.index,opacity:(m.material as T.MeshBasicMaterial).opacity}))};}
+  dispose(){this.loading++;this.arc?.dispose();this.events.abort();this.clearRoute();this.routeRoot.removeFromParent();this.routeGuide.dispose();this.clearEffects();this.clearTrail();if(this.rig)releaseGameObject(this.rig.root);this.releases.forEach(f=>f());this.roots.forEach(r=>r.removeFromParent());this.dialog.remove();this.hud.remove();this.prompt.remove();}
 }

@@ -1,5 +1,6 @@
 import {Arcade,arcadeCatalog,arcadeScoreKey,blockInterval,mergeDuration} from '../../shared/arcade.mjs';
 import {readBest,saveBest} from '../../shared/seasonal-games.mjs';
+import {orbRadii,orbNames} from '../../shared/falling-merge.mjs';
 
 const colors=['#ede4d2','#769b9c','#cdaf66','#b87a88','#83a787','#6b88a0','#bc8065','#a491b6'];
 const symbols=['✿','❄','☀','☾','♧','♫','◇','✦'];
@@ -18,8 +19,9 @@ export class ArcadeRoom{
     host.querySelector('[data-pause]')!.addEventListener('click',()=>this.pause(!this.paused),opts);
     host.querySelector('[data-restart]')!.addEventListener('click',()=>{this.store();this.game=new Arcade(id);this.recorded=false;this.result.hidden=true;this.score=-1;this.pause(false);},opts);
     const pad=host.querySelector<HTMLElement>('.arcade-pad')!;pad.hidden=id==='pairs';
-    if(id!=='blocks'&&id!=='bricks')pad.querySelector<HTMLElement>('[data-key="space"]')!.hidden=true;
-    if(id==='bricks')for(const key of ['up','down'])pad.querySelector<HTMLElement>(`[data-key="${key}"]`)!.hidden=true;
+    if(!['blocks','bricks','falling'].includes(id))pad.querySelector<HTMLElement>('[data-key="space"]')!.hidden=true;
+    if(id==='bricks'||id==='falling')for(const key of ['up','down'])pad.querySelector<HTMLElement>(`[data-key="${key}"]`)!.hidden=true;
+    if(id==='falling')pad.querySelector<HTMLElement>('[data-key="space"]')!.textContent='投下小球';
     host.querySelectorAll<HTMLButtonElement>('[data-key]').forEach(button=>{
       button.addEventListener('pointerdown',e=>{e.preventDefault();if(this.paused||e.button!==0)return;button.setPointerCapture(e.pointerId);const key=button.dataset.key!;this.press(key);this.pointers.set(e.pointerId,key);this.repeat=.20;},opts);
       button.addEventListener('click',e=>{if(e.detail===0)this.press(button.dataset.key!);},opts);
@@ -27,9 +29,9 @@ export class ArcadeRoom{
     });
     const cards=host.querySelector<HTMLElement>('.arcade-cards')!;cards.hidden=id!=='pairs';
     if(id==='pairs'){cards.innerHTML=Array.from({length:16},(_,i)=>`<button data-card="${i}" aria-label="翻开第 ${i+1} 张卡片">${i+1}</button>`).join('');cards.addEventListener('click',e=>{const b=(e.target as HTMLElement).closest<HTMLButtonElement>('[data-card]');if(b&&!this.paused)this.game.flip(Number(b.dataset.card));},opts);}
-    this.canvas.addEventListener('pointerdown',e=>{if(this.paused||e.button!==0||this.dragPointer!==null)return;this.canvas.focus();this.canvas.setPointerCapture(e.pointerId);const p=this.point(e);this.drag=p;this.dragPointer=e.pointerId;if(id==='bricks'){this.game.paddle=Math.max(.1,Math.min(.9,p.x));this.press('space');}if(id==='pairs')this.game.flip(Math.floor(p.y*4)*4+Math.floor(p.x*4));},opts);
-    this.canvas.addEventListener('pointermove',e=>{if(e.pointerId===this.dragPointer&&this.drag&&id==='bricks'&&!this.paused)this.game.paddle=Math.max(.1,Math.min(.9,this.point(e).x));},opts);
-    this.canvas.addEventListener('pointerup',e=>{if(e.pointerId!==this.dragPointer)return;if(this.drag&&id==='merge'){const p=this.point(e),dx=p.x-this.drag.x,dy=p.y-this.drag.y;if(Math.hypot(dx,dy)>.06)this.press(Math.abs(dx)>Math.abs(dy)?dx>0?'right':'left':dy>0?'down':'up');}this.drag=null;this.dragPointer=null;},opts);
+    this.canvas.addEventListener('pointerdown',e=>{if(this.paused||e.button!==0||this.dragPointer!==null)return;this.canvas.focus();this.canvas.setPointerCapture(e.pointerId);const p=this.point(e);this.drag=p;this.dragPointer=e.pointerId;if(id==='bricks'){this.game.paddle=Math.max(.1,Math.min(.9,p.x));this.press('space');}if(this.game.falling)this.game.falling.aim=p.x;if(id==='pairs')this.game.flip(Math.floor(p.y*4)*4+Math.floor(p.x*4));},opts);
+    this.canvas.addEventListener('pointermove',e=>{if(this.paused)return;const x=this.point(e).x;if(e.pointerId===this.dragPointer&&this.drag&&id==='bricks')this.game.paddle=Math.max(.1,Math.min(.9,x));if(this.game.falling&&(this.dragPointer===null||e.pointerId===this.dragPointer))this.game.falling.aim=x;},opts);
+    this.canvas.addEventListener('pointerup',e=>{if(e.pointerId!==this.dragPointer)return;if(this.drag&&id==='merge'){const p=this.point(e),dx=p.x-this.drag.x,dy=p.y-this.drag.y;if(Math.hypot(dx,dy)>.06)this.press(Math.abs(dx)>Math.abs(dy)?dx>0?'right':'left':dy>0?'down':'up');}if(id==='falling')this.press('space');this.drag=null;this.dragPointer=null;},opts);
     const cancelDrag=(e:PointerEvent)=>{if(e.pointerId===this.dragPointer){this.drag=null;this.dragPointer=null;}};
     this.canvas.addEventListener('pointercancel',cancelDrag,opts);this.canvas.addEventListener('lostpointercapture',cancelDrag,opts);
     window.addEventListener('keydown',e=>{
@@ -55,8 +57,8 @@ export class ArcadeRoom{
       this.game.axis=Number(held.has('right'))-Number(held.has('left'));this.game.update(dt);
     }
     if(this.game.over&&!this.recorded&&this.game.mergeAge>=mergeDuration){const r=this.store();this.result.hidden=false;this.result.innerHTML=`<b>${this.game.won&&this.id!=='merge'?'✦ 完成啦':'本局结束'}</b><span>${this.game.score} 分${r?.record?' · 新纪录':''}</span><small>${r?.saved?'成绩已保存':'暂时无法保存成绩'}</small>`;}
-    if(this.game.score!==this.score||['pairs','bricks','blocks'].includes(this.id)){
-      this.score=this.game.score;this.status.innerHTML=`<small>本局得分</small><strong>${this.score}</strong><span>最佳 ${this.best??'—'}</span><small>${this.id==='blocks'?`消除 ${this.game.lines} 行 · ${(1/blockInterval(this.game.time,this.game.lines,this.game.pieces)).toFixed(1)} 格/秒`:this.id==='bricks'?`${this.game.lives} 次机会 · 第 ${this.game.rows} 排 · 球速 ${(this.game.ballSpeed/.6).toFixed(1)}×`:this.id==='pairs'?`翻牌 ${this.game.flips} 次 · 每张 −5 分`:this.id==='merge'&&this.game.won?'已达 2048 · 继续挑战更大数字':''}</small>`;
+    if(this.game.score!==this.score||['pairs','bricks','blocks','falling'].includes(this.id)){
+      this.score=this.game.score;this.status.innerHTML=`<small>本局得分</small><strong>${this.score}</strong><span>最佳 ${this.best??'—'}</span><small>${this.id==='blocks'?`消除 ${this.game.lines} 行 · ${(1/blockInterval(this.game.time,this.game.lines,this.game.pieces)).toFixed(1)} 格/秒`:this.id==='bricks'?`${this.game.lives} 次机会 · 第 ${this.game.rows} 排 · 球速 ${(this.game.ballSpeed/.6).toFixed(1)}×`:this.id==='pairs'?`翻牌 ${this.game.flips} 次 · 每张 −5 分`:this.game.falling?`已投 ${this.game.falling.drops} 颗 · 最大 ${orbNames[this.game.falling.highest]}<br>下一颗 ${orbNames[this.game.falling.next[0]]} · 随后 ${orbNames[this.game.falling.next[1]]}`:this.id==='merge'&&this.game.won?'已达 2048 · 继续挑战更大数字':''}</small>`;
     }
     this.draw();
   };
@@ -88,6 +90,21 @@ export class ArcadeRoom{
     else if(this.id==='pairs'){
       g.cards.forEach((v,i)=>{const shown=g.open.includes(i)||g.matched.includes(i);cell(i%4*120,Math.floor(i/4)*120,120,g.matched.includes(i)?'#9fba9e':shown?'#e0be86':'#c5d4ce',shown?symbols[v]:'✧');});
       this.host.querySelectorAll<HTMLButtonElement>('[data-card]').forEach((b,i)=>{const shown=g.open.includes(i)||g.matched.includes(i);b.textContent=shown?symbols[g.cards[i]]:String(i+1);b.disabled=g.matched.includes(i);b.setAttribute('aria-label',`${i+1} 号卡片${shown?' '+symbols[g.cards[i]]:''}`);});
+    }else if(g.falling){
+      const game=g.falling;
+      c.strokeStyle='#ad9b7d';c.lineWidth=3;c.beginPath();c.moveTo(.07*w,.22*w);c.lineTo(.07*w,.94*w);c.quadraticCurveTo(.5*w,.96*w,.93*w,.94*w);c.lineTo(.93*w,.22*w);c.stroke();
+      c.strokeStyle=game.overflow>0?'#bd6e58':'#ceb9a1';c.setLineDash([5,7]);c.beginPath();c.moveTo(.085*w,.20*w);c.lineTo(.915*w,.20*w);c.stroke();c.setLineDash([]);
+      const orb=(x:number,y:number,r:number,level:number,scale=1)=>{
+        r*=scale;const px=x*w,py=y*w,radius=r*w;
+        c.fillStyle=colors[1+level%7];c.beginPath();c.arc(px,py,radius,0,Math.PI*2);c.fill();
+        c.strokeStyle='#796c5355';c.lineWidth=1.3;c.stroke();c.fillStyle='#fff7e8a0';c.beginPath();c.ellipse(px-radius*.28,py-radius*.32,radius*.26,radius*.14,-.4,0,Math.PI*2);c.fill();
+        c.fillStyle='#494332';c.textAlign='center';c.textBaseline='middle';c.font=`500 ${Math.max(12,radius*.77)}px "Songti SC",serif`;c.fillText(orbNames[level],px,py+radius*.12);
+      };
+      for(const b of game.balls)orb(b.x,b.y,b.r,b.level,matchMedia('(prefers-reduced-motion: reduce)').matches?1:1+.07*Math.max(0,1-b.wait/.08)*Math.sin(b.wait/.08*Math.PI));
+      const radius=orbRadii[game.next[0]],aim=Math.max(.07+radius,Math.min(.93-radius,game.aim));
+      c.globalAlpha=game.ready?1:.45;orb(aim,.085,radius,game.next[0]);c.globalAlpha=1;
+      c.strokeStyle='#9b886e66';c.setLineDash([3,6]);c.beginPath();c.moveTo(aim*w,(.085+radius)*w);c.lineTo(aim*w,.91*w);c.stroke();c.setLineDash([]);
+      if(!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const e of game.effects){c.strokeStyle=`rgba(181,135,65,${1-e.age/.3})`;c.lineWidth=2;c.beginPath();c.arc(e.x*w,e.y*w,e.r*w*(1+e.age*2),0,Math.PI*2);c.stroke();}
     }else{
       for(const b of g.bricks){c.fillStyle=colors[b.tone];c.beginPath();c.roundRect(b.x*480,b.y*480,.11*480,.036*480,3);c.fill();}
       c.strokeStyle='#b87865';c.setLineDash([5,5]);c.beginPath();c.moveTo(12,.8*480);c.lineTo(468,.8*480);c.stroke();c.setLineDash([]);
@@ -97,6 +114,6 @@ export class ArcadeRoom{
     }
     if(this.paused){c.fillStyle='#f3eddfdf';c.fillRect(0,0,w,w);c.fillStyle='#514c42';c.textAlign='center';c.font='28px serif';c.fillText('暂停 · 喝一口热茶',240,240);}
   }
-  get snapshot(){return {id:this.id,score:this.game.score,over:this.game.over,paused:this.paused,won:this.game.won,lines:this.game.lines,moves:this.game.moves,time:this.game.time,piece:{x:this.game.px,y:this.game.py},paddle:this.game.paddle,flips:this.game.flips,rows:this.game.rows,ballSpeed:this.game.ballSpeed,ball:{...this.game.ball},snake:this.game.snake.map(p=>({...p})),mergeAge:this.game.mergeAge,board:this.game.board};}
+  get snapshot(){return {id:this.id,score:this.game.score,over:this.game.over,paused:this.paused,won:this.game.won,lines:this.game.lines,moves:this.game.moves,time:this.game.time,piece:{x:this.game.px,y:this.game.py},paddle:this.game.paddle,flips:this.game.flips,rows:this.game.rows,rowProgress:this.game.rowTravel,ballSpeed:this.game.ballSpeed,ball:{...this.game.ball},snake:this.game.snake.map(p=>({...p})),mergeAge:this.game.mergeAge,board:this.game.board,falling:this.game.falling?{drops:this.game.falling.drops,highest:this.game.falling.highest,next:[...this.game.falling.next],balls:this.game.falling.balls.map(b=>({...b})),cooldown:this.game.falling.cooldown,overflow:this.game.falling.overflow}:null};}
   dispose(){this.store();cancelAnimationFrame(this.frame);this.events.abort();}
 }

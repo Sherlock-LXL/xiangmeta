@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {makeCourse,createRace,advanceRace,raceGrade,resetRaceVehicle,createVehicle,advanceVehicle,seaClear,readBest,saveBest,formatTime} from '../shared/seasonal-games.mjs';
 import {Arcade,mergeLine,blockInterval,mergeDuration,arcadeScoreKey} from '../shared/arcade.mjs';
-import {seaPath,waterClear} from '../shared/game-routes.mjs';
+import {seaPath,waterClear,waterContact} from '../shared/game-routes.mjs';
+import {guidanceWindow,gateVisibility} from '../shared/race-guidance.mjs';
+import {FallingMerge,orbRadii} from '../shared/falling-merge.mjs';
 import {seededRandom} from '../shared/living-catalog.mjs';
 const regions=JSON.parse(readFileSync(new URL('../data/world.json',import.meta.url))).regions;
 const crossing=g=>[{x:g.x-g.nx*8,y:g.y,z:g.z-g.nz*8},{x:g.x+g.nx*8,y:g.y,z:g.z+g.nz*8}];
@@ -129,7 +131,7 @@ test('drift turns the motorcycle more sharply, retains a short slide and recover
 test('time rounding carries into the next minute and flight gates match their circular opening',()=>{
   assert.equal(formatTime(59.999),'01:00.00');assert.equal(formatTime(119.999),'02:00.00');assert.equal(formatTime(Infinity),'—');
   const course=makeCourse('autumn',regions),race=createRace(course),g=course.gates[1];race.countdown=0;
-  const miss=crossing(g).map(p=>({...p,x:p.x+g.nz*g.radius*.8,z:p.z-g.nx*g.radius*.8,y:p.y+g.radius*.8}));
+  const miss=crossing(g).map(p=>({...p,x:p.x+g.nz*g.radius*.95,z:p.z-g.nx*g.radius*.95,y:p.y+g.radius*.95}));
   assert.equal(advanceRace(race,...miss,.1),false);assert.equal(race.passed,0);
 });
 test('releasing boost preserves momentum, depletion waits for release, and the full motorcycle body stops at walls',()=>{
@@ -151,4 +153,62 @@ test('snake buffers two quick corners and rejects a reversal against the queued 
   const g=new Arcade('snake');g.action('up');g.action('left');g.action('down');
   for(let i=0;i<2;i++)g.update(.1);assert.deepEqual(g.snake[0],{x:7,y:7});
   for(let i=0;i<2;i++)g.update(.1);assert.deepEqual(g.snake[0],{x:6,y:7});assert.equal(g.over,false);
+});
+test('reset preserves elapsed time, pauses it for three seconds, and adds a separate penalty',()=>{
+  const course=makeCourse('summer',regions),race=createRace(course);race.countdown=0;race.elapsed=42;
+  const next=race.next,lap=race.lap;resetRaceVehicle(race);assert.equal(race.countdown,3);assert.equal(race.penalty,5);
+  for(let i=0;i<3;i++)advanceRace(race,...crossing(course.gates[next]),1);
+  assert.equal(race.elapsed,42);assert.equal(race.next,next);assert.equal(race.lap,lap);
+  advanceRace(race,...crossing(course.gates[next]),.5);assert.equal(race.elapsed,42.5);
+});
+test('flight rings allow a slight graze and the glider has a slower default and dive cap',()=>{
+  const course=makeCourse('autumn',regions),g=course.gates[1],race=createRace(course);race.countdown=0;
+  const graze=crossing(g).map(p=>({...p,x:p.x+g.nz*(g.radius+.8),z:p.z-g.nx*(g.radius+.8)}));
+  assert.equal(advanceRace(race,...graze,.1),true);
+  const miss=createRace(course);miss.countdown=0;
+  assert.equal(advanceRace(miss,...graze.map(p=>({...p,y:g.y+4})),.1),false);
+  const s=createVehicle('autumn',course.spawn);assert.equal(s.speed,11);
+  for(let i=0;i<120;i++)advanceVehicle(s,{throttle:1},.1,regions,[]);
+  assert.ok(s.speed<=19);
+});
+test('guidance shows imminent gates and selects the current branch at a coincident crossing',()=>{
+  const gateIndices=[0,2,5,7],path=[
+    {x:0,y:0,z:0},{x:1,y:0,z:0},{x:2,y:0,z:0},{x:2,y:0,z:1},{x:1,y:0,z:1},{x:0,y:0,z:1},{x:1,y:0,z:0},{x:2,y:0,z:-1},{x:0,y:0,z:0},
+  ];
+  const race={next:1,course:{path,gateIndices}},window=guidanceWindow(race,{x:1,y:0,z:0});
+  assert.ok(window.some(p=>p.z===1));assert.ok(!window.some(p=>p.z===-1));
+  assert.deepEqual(Array.from({length:6},(_,i)=>gateVisibility(5,i,6)),[.48,.10,0,0,0,1]);
+});
+test('boats slide along shore contact and reverse promptly without growing a trapped collision box',()=>{
+  for(const yaw of [-Math.PI/2,-Math.PI/2+.3]){
+    const s=createVehicle('summer',{x:51,y:-5.65,z:24,yaw});
+    for(let i=0;i<130;i++)advanceVehicle(s,{throttle:1},1/30,regions,[]);
+    assert.ok(waterContact(s.x,s.z,regions,s.yaw).depth<.001);
+    const start={x:s.x,z:s.z};
+    for(let i=0;i<60;i++)advanceVehicle(s,{throttle:-1,turn:.15},1/30,regions,[]);
+    assert.ok(Math.hypot(s.x-start.x,s.z-start.z)>1);
+    assert.ok(waterContact(s.x,s.z,regions,s.yaw).depth<.001);
+  }
+});
+test('breakout replenishes exactly once on the last brick of a row and resets its automatic progress',()=>{
+  const g=new Arcade('bricks'),rows=g.rows;g.rowTravel=.032;
+  for(let i=0;i<7;i++)g.hitBrick(g.bricks.findIndex(b=>b.row===0));
+  assert.equal(g.rows,rows);g.hitBrick(g.bricks.findIndex(b=>b.row===0));
+  assert.equal(g.rows,rows+1);assert.equal(g.rowTravel,0);assert.equal(g.bricks.filter(b=>b.row===rows).length,7);
+  assert.ok(g.bricks.filter(b=>b.row!==rows).every(b=>b.y>=.148));
+});
+test('falling balls merge in chains, respect drop cooldown and settle without tunneling',()=>{
+  const g=new FallingMerge(()=>0);assert.equal(g.drop(),true);assert.equal(g.drop(),false);
+  for(let i=0;i<60;i++)g.update(1/120);
+  for(let i=0;i<17;i++){g.drop();for(let t=0;t<60;t++)g.update(1/120);}
+  for(let i=0;i<240;i++)g.update(1/120);
+  assert.equal(g.over,false);assert.ok(g.highest>=4);assert.ok(g.balls.length<5);assert.ok(g.score>0);
+  for(const b of g.balls){assert.ok(b.x-b.r>=.07&&b.x+b.r<=.93);assert.ok(b.y+b.r<=.940001);}
+  const before=JSON.stringify(g);g.update(0);assert.equal(JSON.stringify(g),before);
+});
+test('the largest falling circles remain stable and a pile above the limit ends after a grace period',()=>{
+  const g=new FallingMerge(()=>0),r=orbRadii.at(-1);
+  for(let i=0;i<3;i++){const b=g.make(orbRadii.length-1,.5,.94-r-i*r*2);b.age=2;g.balls.push(b);}
+  assert.equal(g.over,false);for(let i=0;i<400&&!g.over;i++)g.update(1/120);
+  assert.equal(g.over,true);assert.ok(g.balls.every(b=>Number.isFinite(b.y)));
 });

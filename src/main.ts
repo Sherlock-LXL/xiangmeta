@@ -46,7 +46,7 @@ async function boot(){
       <a class="brand" href="#" aria-label="返回世界总览"><span class="brand-symbol xiang-logo" aria-hidden="true">${brandMark}</span><span>XiangMeta<small>A PERSONAL UNIVERSE</small></span></a>
       <div class="side-caption">EXPLORATION <span>探索无界</span></div>
       <button class="nav-overview active" id="overview" aria-label="世界总览" title="世界总览">${navIcon('world')} <span>世界总览</span><span class="nav-end">⌘</span></button>
-      <button class="secondary-nav" id="seasonal-games" aria-label="四季游乐" title="四季游乐">${navIcon('world')} <span>四季游乐</span><b>4</b></button>
+      <button class="secondary-nav" id="seasonal-games" aria-label="四季游乐" title="四季游乐">${navIcon('world')} <span>四季游乐</span><span class="nav-end" aria-hidden="true">${diagonalArrow}</span></button>
       <div class="nav-section-label">探索大陆</div>
       <nav id="regions">${data.regions.map((r,i)=>`<button class="region-nav" data-region="${r.id}" aria-label="${escape(r.title)}" title="${escape(r.title)}" style="--accent:${r.color};--pigment:${pigmentAccent(r.color)}">${navIcon(['mountain','science','museum','studio'][i])}<span>${escape(r.title)}<small>${escape(r.english)}</small></span><span class="nav-end">${diagonalArrow}</span></button>`).join('')}</nav>
       <div class="side-divider"></div>

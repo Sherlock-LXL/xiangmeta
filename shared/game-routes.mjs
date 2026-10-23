@@ -6,9 +6,13 @@ import {overlaps,onGround,walkable} from './navigation.mjs';
 import {bridgeLayout} from './bridge-layout.mjs';
 import {harbor} from './harbor.mjs';
 
-export function waterClear(x,z,regions,yaw=0){
-  if(Math.hypot(x,z)>148)return false;
+/** Compact capsule around the hull, with contact normals for sliding along the shore. */
+export function waterContact(x,z,regions,yaw=0){
+  let contact={depth:0,nx:0,nz:0};
+  const touch=(depth,nx,nz)=>{if(depth>contact.depth)contact={depth,nx,nz};};
+  const boundary=Math.hypot(x,z);touch(boundary-148,-x/(boundary||1),-z/(boundary||1));
   const bodies=[{position:[0,0],radius:9},...regions];
+  const hullRadius=.60;
   for(const along of [-1.05,0,1.05]){
     const px=x+Math.sin(yaw)*along,pz=z+Math.cos(yaw)*along;
     for(const r of bodies){
@@ -16,17 +20,43 @@ export function waterClear(x,z,regions,yaw=0){
       const angle=Math.abs(Math.atan2(Math.sin(Math.atan2(dz,dx)-toward),Math.cos(Math.atan2(dz,dx)-toward)));
       // The existing bridge mouths have sheer cliffs and no shoreline boulders.
       const mouth=r.radius===9||angle<4/r.radius;
-      if(d<(mouth?r.radius+1.15:r.radius*1.1+2.1)+.78)return false;
+      const shore=mouth?r.radius+.70:r.radius*1.085+1.05;
+      touch(shore+hullRadius-d,dx/(d||1),dz/(d||1));
     }
-    if(pz>harbor.rampStart-1&&pz<harbor.deckEnd+1.5&&Math.abs(px)<(pz<harbor.rampEnd?harbor.halfWidth:harbor.deckHalfWidth)+.9)return false;
-    if(Math.hypot(px,pz-34)<7)return false;
+    const rect=(cx,cz,hx,hz)=>{
+      const dx=px-cx,dz=pz-cz,ax=hx+hullRadius-Math.abs(dx),az=hz+hullRadius-Math.abs(dz);
+      if(ax>0&&az>0){if(ax<az)touch(ax,Math.sign(dx)||1,0);else touch(az,0,Math.sign(dz)||1);}
+    };
+    rect(0,(harbor.rampStart+harbor.rampEnd)/2,harbor.halfWidth,(harbor.rampEnd-harbor.rampStart)/2);
+    rect(0,(harbor.rampEnd+harbor.deckEnd)/2,harbor.deckHalfWidth,(harbor.deckEnd-harbor.rampEnd)/2);
+    const dockDistance=Math.hypot(px,pz-34);touch(6.1+hullRadius-dockDistance,px/(dockDistance||1),(pz-34)/(dockDistance||1));
     for(const r of regions){
       const b=bridgeLayout(r),lateral=px*b.uz-pz*b.ux,long=px*b.ux+pz*b.uz;
-      if(Math.abs(lateral)>b.half+.9||long<b.start-.5||long>b.end+.5)continue;
-      const delta=Math.min(...b.centres.map(c=>Math.abs(long-b.mid-c)))+.78;
-      if(delta>=b.radius||b.spring+Math.sqrt(b.radius*b.radius-delta*delta)<-4.0)return false;
+      if(Math.abs(lateral)>b.half+hullRadius||long<b.start-.3||long>b.end+.3)continue;
+      const centre=b.centres.reduce((best,c)=>Math.abs(long-b.mid-c)<Math.abs(long-b.mid-best)?c:best,b.centres[0]);
+      const offset=long-b.mid-centre,headroom=Math.max(0,-4.10-b.spring);
+      const opening=Math.sqrt(Math.max(0,b.radius*b.radius-headroom*headroom))-hullRadius;
+      const penetration=Math.abs(offset)-opening;
+      if(penetration>0){
+        const side=b.half+hullRadius-Math.abs(lateral);
+        if(side<penetration)touch(side,Math.sign(lateral)*b.uz,-Math.sign(lateral)*b.ux);
+        else touch(penetration,-Math.sign(offset)*b.ux,-Math.sign(offset)*b.uz);
+      }
     }
   }
+  return contact;
+}
+export const waterClear=(x,z,regions,yaw=0)=>waterContact(x,z,regions,yaw).depth<=.00001;
+
+/** Resolve only inward velocity; tangent motion and reversing remain available after contact. */
+export function moveBoat(state,dx,dz,regions){
+  const before=waterContact(state.x,state.z,regions,state.yaw),next=waterContact(state.x+dx,state.z+dz,regions,state.yaw);
+  if(next.depth<=.00001||next.depth<before.depth-.000001){state.x+=dx;state.z+=dz;return next.depth>0;}
+  const inward=dx*next.nx+dz*next.nz,sx=dx-Math.min(0,inward)*next.nx,sz=dz-Math.min(0,inward)*next.nz;
+  const slide=waterContact(state.x+sx,state.z+sz,regions,state.yaw);
+  if(slide.depth<=.00001||slide.depth<before.depth-.000001){state.x+=sx;state.z+=sz;}
+  const velocity=state.vx*next.nx+state.vz*next.nz;
+  if(velocity<0){state.vx-=velocity*next.nx;state.vz-=velocity*next.nz;}
   return true;
 }
 

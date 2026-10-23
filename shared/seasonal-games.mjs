@@ -1,13 +1,13 @@
 import {advanceWalker,createWalker} from './locomotion.mjs';
 import {groundHeight} from './terrain-height.mjs';
 import {supportedFootprint,bodyFootprint,onGround,overlaps} from './navigation.mjs';
-import {landPath,seaPath,skyPath,waterClear} from './game-routes.mjs';
+import {landPath,seaPath,skyPath,waterClear,waterContact,moveBoat} from './game-routes.mjs';
 
 export const gameCatalog=[
   {id:'spring',name:'四季环岛骑行',vehicle:'山地摩托',tag:'LAND / 春',color:'#ba685e',description:'穿过四岛与中央枢纽，按住 Shift 漂移入弯。',controls:'W / S 油门与倒车 · A / D 转向 · Shift + 转向 漂移 · 空格 刹车 · E 加速'},
   {id:'summer',name:'群岛穿桥航线',vehicle:'海滩快艇',tag:'SEA / 夏',color:'#497f7e',description:'绕过四季海岸，穿过石桥拱洞与回旋水道。',controls:'W / S 油门与倒车 · A / D 舵向 · 空格 减速 · Shift 冲浪加速'},
   {id:'autumn',name:'山海长空巡游',vehicle:'滑翔伞',tag:'SKY / 秋',color:'#aa7b39',description:'高低交错的群岛长航线，掠过秋林与春山。',controls:'W 俯冲 · S 抬升 · A / D 倾斜转弯 · 空格 空气刹车 · 金色气流补充高度'},
-  {id:'winter',name:'雪夜游艺室',vehicle:'五款小游戏',tag:'ARCADE / 冬',color:'#687f9f',description:'围坐一盏暖灯，把下雪的时间交给游戏。',controls:'方向键 / 触屏操作 · P 暂停'},
+  {id:'winter',name:'雪夜游艺室',vehicle:'六款小游戏',tag:'ARCADE / 冬',color:'#687f9f',description:'围坐一盏暖灯，把下雪的时间交给游戏。',controls:'方向键 / 触屏操作 · P 暂停'},
 ];
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const angleDiff=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
@@ -33,8 +33,8 @@ export function makeCourse(id,regions,obstacles=[]){
   if(Math.hypot(gates.at(-1).x-gates[0].x,gates.at(-1).z-gates[0].z)<(id==='spring'?5:15))gates.pop();
   const radius=id==='spring'?1.65:id==='summer'?5.2:6;
   gates.forEach((g,i)=>{const at=indices[i],a=path[(at-3+path.length-1)%(path.length-1)],b=path[(at+3)%(path.length-1)],d=Math.hypot(b.x-a.x,b.z-a.z)||1;Object.assign(g,{nx:(b.x-a.x)/d,nz:(b.z-a.z)/d,radius});});
-  const reference=length*2/(id==='spring'?4.4:id==='summer'?9.5:14);
-  return {id,version:2,path,gates,laps:2,length,medals:[reference,reference*1.35],spawn:{...gates[0],yaw:Math.atan2(gates[0].nx,gates[0].nz)}};
+  const reference=length*2/(id==='spring'?4.4:id==='summer'?9.5:10.8);
+  return {id,version:id==='autumn'?3:2,path,gates,gateIndices:indices.slice(0,gates.length),laps:2,length,medals:[reference,reference*1.35],spawn:{...gates[0],yaw:Math.atan2(gates[0].nx,gates[0].nz)}};
 }
 /** @param {ReturnType<typeof makeCourse>} course */
 export function createRace(course,leisure=false){return {course,leisure,next:1,lap:1,elapsed:0,penalty:0,countdown:3,finished:false,passed:0};}
@@ -46,7 +46,7 @@ export function advanceRace(race,previous,current,dt){
   if(a>0||b<=0)return false;
   const t=-a/(b-a),x=previous.x+(current.x-previous.x)*t,z=previous.z+(current.z-previous.z)*t,y=previous.y+(current.y-previous.y)*t;
   const horizontal=Math.hypot(x-g.x,z-g.z);
-  if(race.course.id==='autumn'?Math.hypot(horizontal,y-g.y)>g.radius:horizontal>g.radius||Math.abs(y-g.y)>2.8)return false;
+  if(race.course.id==='autumn'?Math.hypot(horizontal,y-g.y)>g.radius+1.25:horizontal>g.radius||Math.abs(y-g.y)>2.8)return false;
   race.passed++;
   if(race.next===0){if(race.lap===race.course.laps)race.finished=true;else race.lap++;}
   race.next=(race.next+1)%race.course.gates.length;return true;
@@ -55,6 +55,7 @@ export const raceGrade=(race)=>race.elapsed+race.penalty<=race.course.medals[0]?
 export function resetRaceVehicle(race){
   const g=race.course.gates[(race.next-1+race.course.gates.length)%race.course.gates.length];
   if(!race.leisure&&race.countdown===0)race.penalty+=5;
+  race.countdown=3;
   return {...g,yaw:Math.atan2(g.nx,g.nz)};
 }
 /** Bad JSON, old formats and unavailable storage never prevent play. */
@@ -67,7 +68,7 @@ export function saveBest(storage,key,value,lower=false){
   try{storage.setItem('xiangmeta.games.v1.'+key,JSON.stringify(best));return {best,record:before===null||best!==before,saved:true};}
   catch{return {best,record:before===null||best!==before,saved:false};}
 }
-export function createVehicle(kind,point){return {...createWalker(point.x,point.z),y:point.y,yaw:point.yaw,speed:kind==='autumn'?14:0,vx:0,vz:0,bank:0,pitch:0,boost:1,boostReady:true,drift:0,kind,hit:false};}
+export function createVehicle(kind,point){return {...createWalker(point.x,point.z),y:point.y,yaw:point.yaw,speed:kind==='autumn'?11:0,vx:0,vz:0,bank:0,pitch:0,boost:1,boostReady:true,drift:0,kind,hit:false};}
 export const seaClear=waterClear;
 /** Fixed short integration steps preserve grip/collision at both 30 and 120 Hz. */
 export function advanceVehicle(s,input,dt,regions,obstacles,time=0){
@@ -77,10 +78,10 @@ export function advanceVehicle(s,input,dt,regions,obstacles,time=0){
     if(s.kind==='autumn'){
       s.bank+=(turn*-.68-s.bank)*(1-Math.exp(-h*8));
       s.pitch+=(-throttle*.43-s.pitch)*(1-Math.exp(-h*7));
-      s.speed=clamp(s.speed+(throttle*(throttle<0?2:5)+(14-s.speed)*.65-(brake?5:0))*h,6,25);
+      s.speed=clamp(s.speed+(throttle*(throttle<0?1.6:3.8)+(11-s.speed)*.75-(brake?4:0))*h,6,19);
       s.yaw+=turn*(.9+s.speed*.04)*(brake?1.6:1)*h;
       const lift=thermals.reduce((v,t)=>Math.max(v,Math.max(0,1-Math.hypot(s.x-t.x,s.z-t.z)/t.radius)*6),0);
-      const vertical=-.55-throttle*(s.speed>8?6.5:2.5)+lift-(s.speed<8?(8-s.speed)*.6:0);
+      const vertical=-.45-throttle*(s.speed>8?5.3:2.5)+lift-(s.speed<8?(8-s.speed)*.6:0);
       s.vy+=(vertical-s.vy)*(1-Math.exp(-h*8));
       s.x+=Math.sin(s.yaw)*s.speed*h;s.z+=Math.cos(s.yaw)*s.speed*h;s.y=clamp(s.y+s.vy*h,-3,64);
       const floor=onGround(s.x,s.z,regions)?groundHeight(s.x,s.z,regions):-5.65;
@@ -92,6 +93,7 @@ export function advanceVehicle(s,input,dt,regions,obstacles,time=0){
       s.boost=clamp(s.boost+h*(boost?-.28:.13),0,1);
       if(s.boost===0)s.boostReady=false;
       const acceleration=bike?8:7,drag=bike?.6:.24,limit=(bike?11.5:18)*(boost?1.4:1);
+      if(throttle*s.speed<0)s.speed*=Math.exp(-h*3.5);
       const beforeSpeed=s.speed;
       s.speed+=throttle*acceleration*h*(boost?1.65:1);s.speed*=Math.exp(-(drag+(brake?5:0))*h);
       s.speed=clamp(s.speed,-3.5,Math.max(limit,beforeSpeed-acceleration*h));
@@ -99,8 +101,9 @@ export function advanceVehicle(s,input,dt,regions,obstacles,time=0){
       const steer=(bike?2.05+2.9*s.drift:2.25)/(1+Math.abs(s.speed)/(bike?22:36));
       const yaw=s.yaw+turn*steer*(s.speed<-.1?-1:1)*Math.min(1,Math.abs(s.speed)/(bike?1:3))*h;
       const footprint=bodyFootprint(yaw,.67);
-      if(!bike||supportedFootprint(s.x,s.z,regions,.43,footprint)&&
-        !obstacles.some(o=>(o.height??Infinity)>s.y+.55&&footprint.some(p=>overlaps(s.x+p.x,s.z+p.z,o,.43))))s.yaw=yaw;
+      if(bike?supportedFootprint(s.x,s.z,regions,.43,footprint)&&
+        !obstacles.some(o=>(o.height??Infinity)>s.y+.55&&footprint.some(p=>overlaps(s.x+p.x,s.z+p.z,o,.43))):
+        waterContact(s.x,s.z,regions,yaw).depth<=waterContact(s.x,s.z,regions,s.yaw).depth+.00001)s.yaw=yaw;
       const grip=bike?14-10*s.drift:4.2,blend=1-Math.exp(-grip*h);
       s.vx+=(Math.sin(s.yaw)*s.speed-s.vx)*blend;s.vz+=(Math.cos(s.yaw)*s.speed-s.vz)*blend;
       const x=s.x,z=s.z,oldY=s.y;
@@ -109,11 +112,10 @@ export function advanceVehicle(s,input,dt,regions,obstacles,time=0){
         advanceWalker(s,{x:s.vx,z:s.vz},h,regions,obstacles,{radius:.43,footprint:support,stepHeight:.55,canEnter:(x,z)=>supportedFootprint(x,z,regions,.43,support)});
         const slope=(s.y-oldY)/(Math.abs(s.speed)*h+.001);s.pitch+=(clamp(Math.atan(slope),-.4,.4)-s.pitch)*(1-Math.exp(-h*7));
       }else{
-        const nx=s.x+s.vx*h,nz=s.z+s.vz*h;
-        if(seaClear(nx,nz,regions,s.yaw)){s.x=nx;s.z=nz;}else s.hit=true;
+        if(moveBoat(s,s.vx*h,s.vz*h,regions))s.hit=true;
         s.y=seaHeight(s.x,s.z,time);s.pitch=(Math.sin(time*3+s.x*.1)*.035)+Math.abs(s.speed)*.009;
       }
-      if(Math.hypot(s.x-x,s.z-z)<Math.hypot(s.vx,s.vz)*h*.3&&Math.abs(s.speed)>1){s.speed*=.75;s.vx*=.7;s.vz*=.7;s.hit=true;}
+      if(bike&&Math.hypot(s.x-x,s.z-z)<Math.hypot(s.vx,s.vz)*h*.3&&Math.abs(s.speed)>1){s.speed*=.75;s.vx*=.7;s.vz*=.7;s.hit=true;}
       s.bank+=(-turn*Math.abs(s.speed)*(bike?.026+s.drift*.016:.016)-s.bank)*(1-Math.exp(-h*9));
     }
   }
