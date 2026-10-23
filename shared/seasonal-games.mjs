@@ -8,7 +8,7 @@ export const gameCatalog=[
   {id:'spring',name:'四季环岛骑行',vehicle:'山地摩托',tag:'春 · 陆地',color:'#ba685e',description:'沿山路与桥梁，环游四岛。',controls:'W / S 油门、倒车 · A / D 转向 · Shift 漂移 · 空格刹车 · E 加速'},
   {id:'summer',name:'群岛穿桥航线',vehicle:'海滩快艇',tag:'夏 · 海上',color:'#497f7e',description:'绕岛航行，穿过石桥。',controls:'W / S 油门、倒车 · A / D 转向 · 空格刹车 · Shift 加速'},
   {id:'autumn',name:'山海长空巡游',vehicle:'滑翔伞',tag:'秋 · 空中',color:'#aa7b39',description:'在群岛上空升降、转弯。',controls:'W 俯冲 · S 抬升 · A / D 转向 · 空格减速'},
-  {id:'winter',name:'雪夜游艺室',vehicle:'六款小游戏',tag:'冬 · 游艺室',color:'#687f9f',description:'选个小游戏，玩一会儿。',controls:'方向键操作 · P 暂停'},
+  {id:'winter',name:'雪夜游艺室',vehicle:'益智小游戏',tag:'冬 · 游艺室',color:'#687f9f',description:'选个小游戏，玩一会儿。',controls:'方向键操作 · P 暂停'},
 ];
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const angleDiff=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));

@@ -32,6 +32,7 @@ export class SeasonalGames{
   private navigation:LivingNavigation;
   private courses=new Map<string,ReturnType<typeof makeCourse>>();
   private storage:Storage;private returnFocus:HTMLElement|null=null;private blocked=false;
+  private touchExperience=document.documentElement.classList.contains('touch-experience');
   constructor(private scene:T.Scene,private host:HTMLElement,private data:Catalog,obstacles:Obstacle[],reserved:{x:number;z:number;radius:number}[],private hooks:Hooks){
     try{this.storage=localStorage;}catch{this.storage={getItem:()=>null,setItem:()=>{throw Error('storage unavailable');}} as unknown as Storage;}
     const random=seededRandom(768);
@@ -289,10 +290,10 @@ export class SeasonalGames{
     countdown.hidden=!text;countdown.querySelector('[data-count]')!.textContent=text;countdown.querySelector<HTMLElement>('[data-count-label]')!.hidden=race.countdown<=0;
     this.hud.querySelector('[data-target]')!.textContent=race.leisure?s.kind==='autumn'?'寻找金色上升气流':s.kind==='summer'?'随海风远行':'随心骑行':`信标 ${race.next+1} / ${race.course.gates.length} · ${Math.round(distance)} m`;
     const arrow=this.hud.querySelector<HTMLElement>('[data-direction]')!;arrow.hidden=race.leisure;arrow.textContent='↑';arrow.style.transform=`rotate(${-angleDiff(s.yaw,Math.atan2(g.x-s.x,g.z-s.z))}rad)`;
-    this.hud.querySelector('[data-notice]')!.textContent=s.hit?'倒车或转向离开':race.leisure?'Esc 暂停':race.penalty?`罚时 +${race.penalty} 秒`:'按顺序通过';
+    this.hud.querySelector('[data-notice]')!.textContent=s.hit?s.kind==='autumn'?'转向避开障碍':'倒车或转向离开':race.leisure?this.touchExperience?'右上角暂停':'Esc 暂停':race.penalty?`罚时 +${race.penalty} 秒`:'按顺序通过';
     const canvas=this.hud.querySelector<HTMLCanvasElement>('canvas')!,ctx=canvas.getContext('2d')!,points=race.course.path;
     ctx.clearRect(0,0,170,140);
-    if(race.leisure){ctx.fillStyle='#746956';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('自由漫游',85,64);ctx.fillText('P / Ⅱ 返回摊位',85,86);return;}
+    if(race.leisure){ctx.fillStyle='#746956';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('自由漫游',85,64);ctx.fillText('暂停后可返回摊位',85,86);return;}
     const xs=points.map(p=>p.x),zs=points.map(p=>p.z),minX=Math.min(...xs),minZ=Math.min(...zs),scale=Math.min(140/(Math.max(...xs)-minX),110/(Math.max(...zs)-minZ));
     const point=(p:{x:number;z:number})=>({x:15+(p.x-minX)*scale,y:15+(p.z-minZ)*scale});
     ctx.globalAlpha=.25;ctx.strokeStyle='#a69a80';ctx.lineWidth=2;ctx.beginPath();points.forEach((p,i)=>{const v=point(p);if(i)ctx.lineTo(v.x,v.y);else ctx.moveTo(v.x,v.y);});ctx.stroke();ctx.globalAlpha=1;
