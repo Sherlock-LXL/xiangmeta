@@ -1,12 +1,12 @@
 import {advanceWalker,createWalker} from './locomotion.mjs';
 import {groundHeight} from './terrain-height.mjs';
-import {mountainRoutes} from './mountain-route.mjs';
-import {supportedFootprint,bodyFootprint,onGround,overlaps,pointSegmentDistance} from './navigation.mjs';
+import {supportedFootprint,bodyFootprint,onGround,overlaps} from './navigation.mjs';
+import {landPath,seaPath,skyPath,waterClear} from './game-routes.mjs';
 
 export const gameCatalog=[
-  {id:'spring',name:'春山骑行',vehicle:'山地摩托',tag:'LAND / 春',color:'#ba685e',description:'沿花径爬坡，在发卡弯前松开油门。',controls:'W / S 油门与倒车 · A / D 转向 · 空格 刹车 · Shift 冲刺'},
-  {id:'summer',name:'逐浪航线',vehicle:'海滩快艇',tag:'SEA / 夏',color:'#497f7e',description:'切过海面，留一道弯弯的浪花。',controls:'W / S 油门与倒车 · A / D 舵向 · 空格 减速 · Shift 冲浪加速'},
-  {id:'autumn',name:'乘风入画',vehicle:'滑翔伞',tag:'SKY / 秋',color:'#aa7b39',description:'掠过金色群岛，借上升气流再飞高一点。',controls:'W 俯冲 · S 抬升 · A / D 倾斜转弯 · 空格 空气刹车 · 金色气流补充高度'},
+  {id:'spring',name:'四季环岛骑行',vehicle:'山地摩托',tag:'LAND / 春',color:'#ba685e',description:'穿过四岛与中央枢纽，按住 Shift 漂移入弯。',controls:'W / S 油门与倒车 · A / D 转向 · Shift + 转向 漂移 · 空格 刹车 · E 加速'},
+  {id:'summer',name:'群岛穿桥航线',vehicle:'海滩快艇',tag:'SEA / 夏',color:'#497f7e',description:'绕过四季海岸，穿过石桥拱洞与回旋水道。',controls:'W / S 油门与倒车 · A / D 舵向 · 空格 减速 · Shift 冲浪加速'},
+  {id:'autumn',name:'山海长空巡游',vehicle:'滑翔伞',tag:'SKY / 秋',color:'#aa7b39',description:'高低交错的群岛长航线，掠过秋林与春山。',controls:'W 俯冲 · S 抬升 · A / D 倾斜转弯 · 空格 空气刹车 · 金色气流补充高度'},
   {id:'winter',name:'雪夜游艺室',vehicle:'五款小游戏',tag:'ARCADE / 冬',color:'#687f9f',description:'围坐一盏暖灯，把下雪的时间交给游戏。',controls:'方向键 / 触屏操作 · P 暂停'},
 ];
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -16,36 +16,25 @@ export const formatTime=t=>{
   const ticks=Math.round(Math.max(0,t)*100);
   return `${Math.floor(ticks/6000).toString().padStart(2,'0')}:${(ticks%6000/100).toFixed(2).padStart(5,'0')}`;
 };
-export const thermals=[{x:-51,z:19,radius:9},{x:-19,z:52,radius:10},{x:4,z:19,radius:8}];
+export const thermals=[{x:-45,z:28,radius:10},{x:-6,z:36,radius:10},{x:14,z:-12,radius:9},{x:-13,z:-58,radius:10},{x:-33,z:-22,radius:9}];
 export const seaHeight=(x,z,t)=>-5.65+Math.sin(x*.17+t*1.8)*.13+Math.sin(z*.22-t*1.3)*.09;
 
 /** Authored routes reuse existing terrain; the game adds no new walkable topology. */
-export function makeCourse(id,regions){
+export function makeCourse(id,regions,obstacles=[]){
   /** @type {{x:number;y:number;z:number}[]} */
-  let path=[];
-  if(id==='spring'){
-    const r=regions.find(r=>r.season==='spring'),routes=mountainRoutes(r),main=routes.find(r=>r.kind==='main').points,shortcut=routes.find(r=>r.kind==='shortcut').points;
-    const nearest=(p)=>main.reduce((best,q,i)=>Math.hypot(q.x-p.x,q.z-p.z)<Math.hypot(main[best].x-p.x,main[best].z-p.z)?i:best,0);
-    const a=nearest(shortcut[0]),b=nearest(shortcut.at(-1));
-    path=[...main.slice(a,b+1),...shortcut.slice().reverse()].map(p=>({x:p.x+r.position[0],z:p.z+r.position[1],y:groundHeight(p.x+r.position[0],p.z+r.position[1],regions)}));
-  }else{
-    for(let i=0;i<=96;i++){
-      const a=i/96*Math.PI*2;
-      path.push(id==='summer'?{x:70+Math.cos(a)*23,z:28+Math.sin(a)*26,y:-5.65}:{x:-23+Math.cos(a)*33,z:25+Math.sin(a)*30,y:24+Math.sin(a*2)*5});
-    }
-  }
+  const path=id==='spring'?landPath(regions,obstacles):id==='summer'?seaPath():skyPath();
   // Arc-length sampling gives each checkpoint enough separation to avoid accidental multi-hits.
   /** @type {{x:number;y:number;z:number;nx:number;nz:number;radius:number}[]} */
-  const gates=[{...path[0],nx:0,nz:1,radius:1}];let distance=0,length=0;
+  const gates=[{...path[0],nx:0,nz:1,radius:1}],indices=[0];let distance=0,length=0;
   for(let i=1;i<path.length;i++){
     const d=Math.hypot(path[i].x-path[i-1].x,path[i].z-path[i-1].z,path[i].y-path[i-1].y);distance+=d;length+=d;
-    if(distance>=(id==='spring'?8:22)&&i<path.length-3){gates.push({...path[i],nx:0,nz:1,radius:1});distance=0;}
+    if(distance>=(id==='spring'?7:20)&&i<path.length-3){gates.push({...path[i],nx:0,nz:1,radius:1});indices.push(i);distance=0;}
   }
   if(Math.hypot(gates.at(-1).x-gates[0].x,gates.at(-1).z-gates[0].z)<(id==='spring'?5:15))gates.pop();
-  const radius=id==='spring'?1.5:id==='summer'?5.6:6;
-  gates.forEach((g,i)=>{const a=gates[(i-1+gates.length)%gates.length],b=gates[(i+1)%gates.length],d=Math.hypot(b.x-a.x,b.z-a.z);Object.assign(g,{nx:(b.x-a.x)/d,nz:(b.z-a.z)/d,radius});});
-  const reference=length*2/(id==='spring'?5.3:id==='summer'?14:12);
-  return {id,version:1,path,gates,laps:2,length,medals:[reference,reference*1.35],spawn:{...gates[0],yaw:Math.atan2(gates[0].nx,gates[0].nz)}};
+  const radius=id==='spring'?1.65:id==='summer'?5.2:6;
+  gates.forEach((g,i)=>{const at=indices[i],a=path[(at-3+path.length-1)%(path.length-1)],b=path[(at+3)%(path.length-1)],d=Math.hypot(b.x-a.x,b.z-a.z)||1;Object.assign(g,{nx:(b.x-a.x)/d,nz:(b.z-a.z)/d,radius});});
+  const reference=length*2/(id==='spring'?4.4:id==='summer'?9.5:14);
+  return {id,version:2,path,gates,laps:2,length,medals:[reference,reference*1.35],spawn:{...gates[0],yaw:Math.atan2(gates[0].nx,gates[0].nz)}};
 }
 /** @param {ReturnType<typeof makeCourse>} course */
 export function createRace(course,leisure=false){return {course,leisure,next:1,lap:1,elapsed:0,penalty:0,countdown:3,finished:false,passed:0};}
@@ -78,53 +67,54 @@ export function saveBest(storage,key,value,lower=false){
   try{storage.setItem('xiangmeta.games.v1.'+key,JSON.stringify(best));return {best,record:before===null||best!==before,saved:true};}
   catch{return {best,record:before===null||best!==before,saved:false};}
 }
-export function createVehicle(kind,point){return {...createWalker(point.x,point.z),y:point.y,yaw:point.yaw,speed:kind==='autumn'?12:0,vx:0,vz:0,bank:0,pitch:0,boost:1,boostReady:true,kind,hit:false};}
-export function seaClear(x,z,regions){
-  return Math.hypot(x,z)<148&&Math.hypot(x,z)>14&&regions.every(r=>Math.hypot(x-r.position[0],z-r.position[1])>r.radius+4)&&pointSegmentDistance(x,z,-10,34,10,34)>8;
-}
+export function createVehicle(kind,point){return {...createWalker(point.x,point.z),y:point.y,yaw:point.yaw,speed:kind==='autumn'?14:0,vx:0,vz:0,bank:0,pitch:0,boost:1,boostReady:true,drift:0,kind,hit:false};}
+export const seaClear=waterClear;
 /** Fixed short integration steps preserve grip/collision at both 30 and 120 Hz. */
 export function advanceVehicle(s,input,dt,regions,obstacles,time=0){
   const steps=Math.max(1,Math.ceil(clamp(dt,0,.1)*120)),h=clamp(dt,0,.1)/steps;s.hit=false;
   for(let k=0;k<steps;k++){
     const turn=clamp(input.turn||0,-1,1),throttle=clamp(input.throttle||0,-1,1),brake=!!input.brake;
     if(s.kind==='autumn'){
-      s.bank+=(turn*-.58-s.bank)*(1-Math.exp(-h*4));
-      s.pitch+=(throttle*.35-s.pitch)*(1-Math.exp(-h*3));
-      s.speed=clamp(s.speed+(throttle*(throttle<0?1.7:4.5)+(12-s.speed)*.45-(brake?5:0))*h,5,23);
-      s.yaw+=turn*(.35+s.speed*.025)*h;
+      s.bank+=(turn*-.68-s.bank)*(1-Math.exp(-h*8));
+      s.pitch+=(-throttle*.43-s.pitch)*(1-Math.exp(-h*7));
+      s.speed=clamp(s.speed+(throttle*(throttle<0?2:5)+(14-s.speed)*.65-(brake?5:0))*h,6,25);
+      s.yaw+=turn*(.9+s.speed*.04)*(brake?1.6:1)*h;
       const lift=thermals.reduce((v,t)=>Math.max(v,Math.max(0,1-Math.hypot(s.x-t.x,s.z-t.z)/t.radius)*6),0);
-      s.vy=-.62-throttle*(s.speed>8?3.7:1.1)+lift-(s.speed<8?(8-s.speed)*.6:0);
+      const vertical=-.55-throttle*(s.speed>8?6.5:2.5)+lift-(s.speed<8?(8-s.speed)*.6:0);
+      s.vy+=(vertical-s.vy)*(1-Math.exp(-h*8));
       s.x+=Math.sin(s.yaw)*s.speed*h;s.z+=Math.cos(s.yaw)*s.speed*h;s.y=clamp(s.y+s.vy*h,-3,64);
       const floor=onGround(s.x,s.z,regions)?groundHeight(s.x,s.z,regions):-5.65;
       if(s.y<floor+2.4||Math.hypot(s.x,s.z)>148||obstacles.some(o=>overlaps(s.x,s.z,o,3.2)&&s.y<(o.height??floor+8)+3.2))s.hit=true;
     }else{
       if(!input.boost&&s.boost>=.25)s.boostReady=true;
       const bike=s.kind==='spring',boost=!!input.boost&&s.boostReady&&s.boost>0&&throttle>0&&!brake;
+      s.drift+=((bike&&input.drift&&Math.abs(turn)>.05&&s.speed>1.5?1:0)-s.drift)*(1-Math.exp(-h*12));
       s.boost=clamp(s.boost+h*(boost?-.28:.13),0,1);
       if(s.boost===0)s.boostReady=false;
       const acceleration=bike?8:7,drag=bike?.6:.24,limit=(bike?11.5:18)*(boost?1.4:1);
       const beforeSpeed=s.speed;
       s.speed+=throttle*acceleration*h*(boost?1.65:1);s.speed*=Math.exp(-(drag+(brake?5:0))*h);
       s.speed=clamp(s.speed,-3.5,Math.max(limit,beforeSpeed-acceleration*h));
-      const steer=(bike?1.55:1.4)/(1+Math.abs(s.speed)/(bike?16:30));
+      s.speed*=Math.exp(-s.drift*.30*h);
+      const steer=(bike?2.05+2.9*s.drift:2.25)/(1+Math.abs(s.speed)/(bike?22:36));
       const yaw=s.yaw+turn*steer*(s.speed<-.1?-1:1)*Math.min(1,Math.abs(s.speed)/(bike?1:3))*h;
       const footprint=bodyFootprint(yaw,.67);
       if(!bike||supportedFootprint(s.x,s.z,regions,.43,footprint)&&
         !obstacles.some(o=>(o.height??Infinity)>s.y+.55&&footprint.some(p=>overlaps(s.x+p.x,s.z+p.z,o,.43))))s.yaw=yaw;
-      const grip=bike?14:2.3,blend=1-Math.exp(-grip*h);
+      const grip=bike?14-10*s.drift:4.2,blend=1-Math.exp(-grip*h);
       s.vx+=(Math.sin(s.yaw)*s.speed-s.vx)*blend;s.vz+=(Math.cos(s.yaw)*s.speed-s.vz)*blend;
       const x=s.x,z=s.z,oldY=s.y;
       if(bike){
         const support=bodyFootprint(s.yaw,.67);
         advanceWalker(s,{x:s.vx,z:s.vz},h,regions,obstacles,{radius:.43,footprint:support,stepHeight:.55,canEnter:(x,z)=>supportedFootprint(x,z,regions,.43,support)});
-        const slope=(s.y-oldY)/(Math.abs(s.speed)*h+.001);s.pitch+=(Math.atan(slope)-s.pitch)*(1-Math.exp(-h*7));
+        const slope=(s.y-oldY)/(Math.abs(s.speed)*h+.001);s.pitch+=(clamp(Math.atan(slope),-.4,.4)-s.pitch)*(1-Math.exp(-h*7));
       }else{
         const nx=s.x+s.vx*h,nz=s.z+s.vz*h;
-        if(seaClear(nx,nz,regions)){s.x=nx;s.z=nz;}else s.hit=true;
-        s.y=seaHeight(s.x,s.z,time);s.pitch=(Math.sin(time*3+s.x*.1)*.035)-Math.abs(s.speed)*.009;
+        if(seaClear(nx,nz,regions,s.yaw)){s.x=nx;s.z=nz;}else s.hit=true;
+        s.y=seaHeight(s.x,s.z,time);s.pitch=(Math.sin(time*3+s.x*.1)*.035)+Math.abs(s.speed)*.009;
       }
       if(Math.hypot(s.x-x,s.z-z)<Math.hypot(s.vx,s.vz)*h*.3&&Math.abs(s.speed)>1){s.speed*=.75;s.vx*=.7;s.vz*=.7;s.hit=true;}
-      s.bank+=(-turn*Math.abs(s.speed)*(bike?.026:.012)-s.bank)*(1-Math.exp(-h*7));
+      s.bank+=(-turn*Math.abs(s.speed)*(bike?.026+s.drift*.016:.016)-s.bank)*(1-Math.exp(-h*9));
     }
   }
   return s;

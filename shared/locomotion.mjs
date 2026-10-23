@@ -3,7 +3,7 @@ import {groundHeight} from './terrain-height.mjs';
 export const GRAVITY=22;
 export const JUMP_SPEED=8;
 export const STEP_HEIGHT=.48;
-export function createWalker(x=0,z=0,regions=[]){return {x,y:groundHeight(x,z,regions),z,vy:0,grounded:true};}
+export function createWalker(x=0,z=0,regions=[]){return {x,y:groundHeight(x,z,regions),z,vy:0,grounded:true,stepOffset:0};}
 function topAt(x,z,obstacles,regions,radius=.35,footprint=[{x:0,z:0}]){
   let top=groundHeight(x,z,regions);
   for(const obstacle of obstacles)if(footprint.some(p=>overlaps(x+p.x,z+p.z,obstacle,radius)))top=Math.max(top,obstacle.height??Infinity);
@@ -47,7 +47,11 @@ export function advanceWalker(state,input,dt,regions,obstacles,options={}){
       if(!onGround(x,z,regions))continue;
       if(options.canEnter&&!options.canEnter(x,z))continue;
       const floor=top(x,z);
-      if(state.grounded&&Math.abs(floor-state.y)<=stepHeight){state.y=floor;state[axis]=axis==='x'?x:z;}
+      if(state.grounded&&Math.abs(floor-state.y)<=stepHeight){
+        const rise=floor-state.y;
+        if(Math.abs(rise)>.055)state.stepOffset=Math.max(-.6,Math.min(.6,(state.stepOffset??0)-rise));
+        state.y=floor;state[axis]=axis==='x'?x:z;
+      }
       else if(clear(x,z))state[axis]=axis==='x'?x:z;
     }
     const separated=separateBodies(state,bodies,radius);
@@ -69,6 +73,7 @@ export function advanceWalker(state,input,dt,regions,obstacles,options={}){
     if(top(state.x,state.z)<state.y-.002)state.grounded=false;
     const terrainFloor=groundHeight(state.x,state.z,regions);
     if(state.y<terrainFloor){state.y=terrainFloor;state.vy=0;state.grounded=true;}
+    state.stepOffset=(state.stepOffset??0)*Math.exp(-h*15);
   }
   return state;
 }

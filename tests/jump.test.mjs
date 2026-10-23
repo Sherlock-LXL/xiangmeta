@@ -62,3 +62,14 @@ test('a mount can leave its island, cross bridges and the hub, and enter a diffe
   }
   assert.equal(supportedFootprint(15,4,world,.48),false,'the sea remains outside the travel area');
 });
+test('step contact resolves immediately while the eye rises smoothly and jump physics remain independent',()=>{
+  const p=createWalker(),curb={x:1,z:0,halfX:.4,halfZ:2,radius:0,height:.42};
+  let last=p.y,largest=0;
+  for(let i=0;i<90;i++){
+    advanceWalker(p,input(1),1/120,regions,[curb]);
+    const visible=p.y+p.stepOffset;largest=Math.max(largest,visible-last);last=visible;
+    assert.equal(p.grounded,true);
+  }
+  assert.equal(p.y,.42);assert.ok(largest<.065);assert.ok(Math.abs(p.stepOffset)<.002);
+  advanceWalker(p,input(0,0,true),1/120,regions,[curb]);assert.ok(p.vy>0);assert.equal(p.grounded,false);
+});

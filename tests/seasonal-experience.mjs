@@ -31,20 +31,20 @@ try{
   await click('#seasonal-games');await click('[data-start="summer"]');
   await page.waitForFunction(()=>window.__xiangmetaInspect().games.race.countdown===0);
   const course=(await state()).race.course;let target=2,finished=false;
-  const deadline=performance.now()+90000;
+  const deadline=performance.now()+240000;
   while(performance.now()<deadline){
     const game=await state();if(game.race.finished){finished=true;break;}
     const s=game.vehicle;let p=course.path[target];
-    while(Math.hypot(p.x-s.x,p.z-s.z)<5){target=(target+1)%course.path.length;p=course.path[target];}
+    while(Math.hypot(p.x-s.x,p.z-s.z)<1.4){target=(target+1)%course.path.length;p=course.path[target];}
     const a=angleDiff(s.yaw,Math.atan2(p.x-s.x,p.z-s.z));
-    const input=[];if(s.speed<14)input.push('w');if(a>.045)input.push('a');if(a<-.045)input.push('d');if(Math.abs(a)>.9)input.push('Space');
-    await hold(input);await frames(.075);
+    const desired=Math.abs(a)>.15?3:10,input=[];if(s.speed<desired)input.push('w');if(a>.035)input.push('a');if(a<-.035)input.push('d');if(s.speed>desired+.2)input.push('Space');
+    await hold(input);await frames(.035);
   }
   await hold([]);assert.equal(finished,true,'two complete laps with real boat controls');
   await page.waitForFunction(()=>!!document.querySelector('[data-grade]'));
   const race=(await state()).race,grade=await page.locator('[data-grade]').getAttribute('data-grade');
   assert.equal(race.passed,course.gates.length*2);assert.ok(['gold','silver','bronze'].includes(grade));
-  const time=race.elapsed+race.penalty,best=await page.evaluate(()=>JSON.parse(localStorage.getItem('xiangmeta.games.v1.race.summer.1')));
+  const time=race.elapsed+race.penalty,best=await page.evaluate(()=>JSON.parse(localStorage.getItem('xiangmeta.games.v1.race.summer.2')));
   assert.equal(best,time);await page.screenshot({path:out+'/race-finish.png'});console.log('real race finish',time,grade);
   await click('[data-again]');assert.equal((await state()).race.passed,0);assert.equal((await state()).race.penalty,0);
   await page.keyboard.press('p');assert.equal((await state()).paused,true);
@@ -64,15 +64,15 @@ try{
   await click('.game-hud [data-pause]');await click('[data-exit]');console.log('retry, clean exit, world-panel pause');
   await click('#seasonal-games');await click('[data-start="autumn"]');
   await page.waitForFunction(()=>window.__xiangmetaInspect().games.race.countdown===0);
-  const sky=(await state()).race.course;target=2;finished=false;const skyDeadline=performance.now()+90000;
+  const sky=(await state()).race.course;target=2;finished=false;const skyDeadline=performance.now()+120000;
   while(performance.now()<skyDeadline){
     const game=await state();if(game.race.finished){finished=true;break;}
     const s=game.vehicle;let p=sky.path[target];
-    while(Math.hypot(p.x-s.x,p.z-s.z)<5){target=(target+1)%sky.path.length;p=sky.path[target];}
+    while(Math.hypot(p.x-s.x,p.z-s.z)<3.8){target=(target+1)%sky.path.length;p=sky.path[target];}
     const a=angleDiff(s.yaw,Math.atan2(p.x-s.x,p.z-s.z)),input=[];
     if(s.y>p.y+.15)input.push('w');if(s.y<p.y-.15)input.push('s');
     if(a>.045)input.push('a');if(a<-.045)input.push('d');
-    await hold(input);await frames(.075);
+    if(Math.abs(a)>.25)input.push('Space');await hold(input);await frames(.035);
   }
   await hold([]);assert.equal(finished,true,'two complete laps through the three-dimensional flight gates');
   assert.equal((await state()).race.penalty,0,'no terrain or building collision on the air course');
@@ -113,7 +113,7 @@ try{
   await click('[data-back]');await click('[data-close]');await page.reload();
   await page.waitForFunction(()=>window.__xiangmetaInspect&&!document.querySelector('#world-loading'),null,{timeout:90000});
   await click('#seasonal-games');assert.ok((await page.locator('.seasonal-card').nth(1).textContent()).includes('最佳'));
-  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('xiangmeta.games.v1.race.summer.1'))),best);
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('xiangmeta.games.v1.race.summer.2'))),best);
   assert.deepEqual(errors,[]);console.log('PASS complete game experience and persisted record after reload');
 }catch(e){await page.screenshot({path:out+'/failure.png'});console.error(errors);throw e;}
 finally{await browser.close();}

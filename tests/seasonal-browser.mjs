@@ -2,9 +2,8 @@ import {chromium,webkit} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {loadCatalog} from '../backend/catalog.mjs';
-import {makeCourse,createRace,advanceRace,createVehicle,advanceVehicle,angleDiff} from '../shared/seasonal-games.mjs';
+import {verifyTours} from './tour-navigation.mjs';
 import {walkable} from '../shared/navigation.mjs';
-import {LivingNavigation} from '../shared/living-navigation.mjs';
 const out=process.env.GAME_ARTIFACTS??'/private/tmp/seasonal-review',touch=process.env.GAME_TOUCH==='1';
 await mkdir(out,{recursive:true});
 const engine=process.env.GAME_ENGINE==='webkit'?webkit:chromium,browser=await engine.launch({headless:true,args:engine===chromium?['--use-angle=metal']:[]});
@@ -32,23 +31,8 @@ try{
   const {regions}=(await loadCatalog(process.cwd())).public;
   for(const s of initial.games.stalls)assert.ok(walkable(s.approach.x,s.approach.z,regions,initial.obstacles),s.id+' approach');
   if(!touch){
-    // Replay the real rendered map with production physics, following the actual authored path.
-    const course=makeCourse('spring',regions),race=createRace(course);race.countdown=0;
-    const nav=new LivingNavigation(regions,initial.obstacles),state=createVehicle('spring',course.spawn);let target=5,lap=0,stalled=0,previousDistance=Infinity;
-    for(let i=0;i<22000&&!race.finished;i++){
-      let p=course.path[target],distance=Math.hypot(p.x-state.x,p.z-state.z);
-      while(distance<1.1){target++;if(target>=course.path.length){target=0;lap++;}p=course.path[target];distance=Math.hypot(p.x-state.x,p.z-state.z);}
-      const angle=angleDiff(state.yaw,Math.atan2(p.x-state.x,p.z-state.z)),before={...state};
-      const desired=Math.abs(angle)>.4?.8:Math.abs(angle)>.18?2.3:4;
-      advanceVehicle(state,{throttle:state.speed<desired?1:0,turn:Math.max(-1,Math.min(1,angle*3)),brake:state.speed>desired+.15},1/60,regions,[...nav.nearby(state.x,state.z,4)],i/60);
-      advanceRace(race,before,state,1/60);
-      if(Math.hypot(before.x-state.x,before.z-state.z)<.0001)stalled++;else stalled=0;
-      previousDistance=distance;
-      if(stalled>180){console.log('route blocked',target,p,state,race.next);break;}
-    }
-    await writeFile(out+'/route-simulation.json',JSON.stringify({state,race,target,lap,previousDistance}));
-    assert.equal(race.finished,true,'spring two laps through actual world colliders');
-    console.log('spring real-world route',race.elapsed);
+    const routes=verifyTours(regions,initial.obstacles);
+    await writeFile(out+'/route-simulation.json',JSON.stringify(routes));
   }
   await menu();assert.equal(await page.locator('.seasonal-card').count(),4);await page.screenshot({path:out+'/menu.png'});console.log('menu');
   await click('[data-start="spring"]');await page.waitForFunction(()=>window.__xiangmetaInspect().games.race?.countdown===0);
@@ -58,7 +42,15 @@ try{
   let s=(await inspect()).games;assert.ok(Math.hypot(s.vehicle.x-before.x,s.vehicle.z-before.z)>.5,'bike moves with real input');
   await page.screenshot({path:out+'/spring.png'});console.log('spring driven');await click('.game-hud [data-pause]');
   const time=(await inspect()).games.race.elapsed;await frames(.35);assert.equal((await inspect()).games.race.elapsed,time);
-  await click('[data-reset]');assert.equal((await inspect()).games.race.penalty,5);await click('.game-hud [data-pause]');await click('[data-exit]');assert.equal((await inspect()).games.vehicle,null);
+  await click('[data-reset]');assert.equal((await inspect()).games.race.penalty,5);
+  if(!touch){
+    await page.keyboard.down('w');await page.waitForFunction(()=>window.__xiangmetaInspect().games.vehicle.speed>3);
+    await page.keyboard.down('Shift');await page.keyboard.down('a');await frames(.25);
+    assert.ok((await inspect()).games.vehicle.drift>.7,'Shift turns the bike into a drift');
+    await page.keyboard.up('Shift');await page.keyboard.up('a');await page.keyboard.up('w');
+    await frames(.6);assert.ok((await inspect()).games.vehicle.drift<.01,'releasing Shift restores grip');
+  }
+  await click('.game-hud [data-pause]');await click('[data-exit]');assert.equal((await inspect()).games.vehicle,null);
   for(const id of ['summer','autumn']){
     await menu();await click(`[data-free="${id}"]`);await page.waitForFunction(()=>window.__xiangmetaInspect().games.race?.countdown===0);
     if(!touch){await page.keyboard.down('w');await page.keyboard.down('a');await frames(1);await page.keyboard.up('w');await page.keyboard.up('a');}
@@ -87,7 +79,7 @@ try{
     console.log('arcade',id);
   }
   await click('[data-close]');assert.equal(await page.locator('.seasonal-dialog').evaluate(d=>d.open),false);
-  const best=await page.evaluate(()=>localStorage.getItem('xiangmeta.games.v1.arcade.blocks'));assert.ok(best!==null);
+  const best=await page.evaluate(()=>localStorage.getItem('xiangmeta.games.v1.arcade.blocks.v2'));assert.ok(best!==null);
   const horizontal=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);assert.equal(horizontal,false);
   assert.deepEqual(errors,[]);console.log('PASS seasonal UI, driving, pause/reset, five arcade games, saved record',best);
 }catch(e){await page.screenshot({path:out+'/failure.png'});console.error('page errors',errors);throw e;}

@@ -1,11 +1,14 @@
 import {clamp} from './seasonal-games.mjs';
 export const arcadeCatalog=[
   {id:'blocks',name:'雪花方块',symbol:'▦',hint:'← → 移动 · ↑ 旋转 · ↓ 加速 · 空格落底',detail:'让一行落满，雪花便会消融。'},
-  {id:'snake',name:'春芽贪吃蛇',symbol:'⌁',hint:'方向键转弯，避开边缘和自己',detail:'拾起春芽，一点点长大。'},
-  {id:'bricks',name:'潮汐打砖块',symbol:'▤',hint:'← → / 拖动移动挡板 · 空格发球',detail:'用一颗小光球，敲开整面彩窗。'},
+  {id:'snake',name:'春芽贪吃蛇',symbol:'⌁',hint:'方向键转弯 · 穿过边缘从对侧出现 · 避开自己',detail:'绕过边界，拾起更多春芽。'},
+  {id:'bricks',name:'无尽潮汐',symbol:'▤',hint:'← → / 拖动挡板 · 空格发球 · 别让砖块抵达红线',detail:'球速渐快，新砖不断落下，能守住多久？'},
   {id:'merge',name:'秋色 2048',symbol:'◇',hint:'方向键 / 滑动合并相同数字',detail:'从 2 开始，让秋色层层相叠。'},
-  {id:'pairs',name:'四季翻翻乐',symbol:'✿',hint:'点开两张卡片，找到相同的季节印记',detail:'记住一枚图案，也记住它的位置。'},
+  {id:'pairs',name:'四季翻翻乐',symbol:'✿',hint:'每翻一张扣 5 分 · 配对加 100 分 · 完成再加 400 分',detail:'用更少的翻牌，记住四季的位置。'},
 ];
+export const arcadeScoreKey=id=>`arcade.${id}${['blocks','snake','bricks','pairs'].includes(id)?'.v2':''}`;
+export const blockInterval=(time,lines,pieces)=>.15+.37*Math.exp(-Math.max(time/45,lines/3,pieces/8)*.16);
+export const mergeDuration=.12;
 const shapes=[[[1,1,1,1]],[[2,2],[2,2]],[[0,3,0],[3,3,3]],[[0,4,4],[4,4,0]],[[5,5,0],[0,5,5]],[[6,0,0],[6,6,6]],[[0,0,7],[7,7,7]]];
 const shuffle=(a,r)=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 export function mergeLine(line){
@@ -21,14 +24,23 @@ export class Arcade{
     /** @type {number[]} */ this.bag=[];
     /** @type {number[][]} */ this.shape=[];
     /** @type {number[][]} */ this.next=[];
-    this.px=3;this.py=0;this.lines=0;
+    this.px=3;this.py=0;this.lines=0;this.pieces=0;
     this.snake=[{x:7,y:8},{x:6,y:8},{x:5,y:8}];this.dir={x:1,y:0};this.queued={x:1,y:0};this.food={x:11,y:8};
     /** @type {{x:number;y:number}[]} */ this.turns=[];
-    this.paddle=.5;this.ball={x:.5,y:.83,vx:.3,vy:-.52};this.serving=true;this.lives=3;this.bricks=Array(40).fill(1);this.axis=0;
+    this.paddle=.5;this.ball={x:.5,y:.83,vx:.3,vy:-.52};this.serving=true;this.lives=3;this.axis=0;
+    /** @type {{x:number;y:number;tone:number}[]} */ this.bricks=[];
+    this.activeTime=0;this.hits=0;this.rowTravel=0;this.rows=4;
+    for(let row=0;row<4;row++)for(let col=0;col<8;col++)this.bricks.push({x:col*.116+.037,y:.1+row*.048,tone:row%6+1});
+    /** @type {{fromX:number;fromY:number;x:number;y:number;value:number}[]} */ this.tiles=[];
+    /** @type {{x:number;y:number}[]} */ this.merges=[];
+    /** @type {{x:number;y:number}|null} */ this.newTile=null;
+    this.mergeAge=mergeDuration;
+    /** @type {string[]} */ this.mergeQueue=[];
     /** @type {number[]} */ this.cards=shuffle([...Array(8).keys(),...Array(8).keys()],random);
     /** @type {number[]} */ this.open=[];
     /** @type {number[]} */ this.matched=[];
-    this.reveal=0;this.moves=0;
+    this.reveal=0;this.moves=0;this.flips=0;
+    if(kind==='pairs')this.score=200;
     if(kind==='blocks'){this.board=Array.from({length:20},()=>Array(10).fill(0));this.next=this.drawPiece();this.spawn();}
     if(kind==='merge'){this.board=Array.from({length:4},()=>Array(4).fill(0));this.addTile();this.addTile();}
   }
@@ -36,6 +48,7 @@ export class Arcade{
   fits(shape=this.shape,x=this.px,y=this.py){return shape.every((row,j)=>row.every((v,i)=>!v||x+i>=0&&x+i<10&&y+j<20&&(y+j<0||!this.board[y+j][x+i])));}
   spawn(){this.shape=this.next;this.next=this.drawPiece();this.px=Math.floor((10-this.shape[0].length)/2);this.py=0;if(!this.fits())this.over=true;}
   lock(){
+    this.pieces++;
     this.shape.forEach((row,j)=>row.forEach((v,i)=>{if(v&&this.py+j>=0)this.board[this.py+j][this.px+i]=v;}));
     const rows=this.board.filter(row=>row.some(v=>!v)),count=20-rows.length;this.lines+=count;this.score+=[0,100,300,500,800][count]*(1+Math.floor(this.lines/10));
     this.board=[...Array.from({length:count},()=>Array(10).fill(0)),...rows];this.spawn();
@@ -43,7 +56,14 @@ export class Arcade{
   drop(){if(this.fits(this.shape,this.px,this.py+1)){this.py++;return true;}this.lock();this.tick=0;return false;}
   addTile(){
     const empty=[];this.board.forEach((r,y)=>r.forEach((v,x)=>{if(!v)empty.push({x,y});}));
-    if(empty.length){const p=empty[Math.floor(this.random()*empty.length)];this.board[p.y][p.x]=this.random()<.9?2:4;}
+    if(empty.length){const p=empty[Math.floor(this.random()*empty.length)];this.board[p.y][p.x]=this.random()<.9?2:4;this.newTile=p;}
+  }
+  get ballSpeed(){return Math.min(1.5,.60+.65*(1-Math.exp(-this.activeTime/130))+Math.min(.25,this.hits*.003));}
+  get rowInterval(){return 8+8*Math.exp(-this.activeTime/150);}
+  addBrickRow(){
+    const gap=Math.floor(this.random()*8);
+    for(let col=0;col<8;col++)if(col!==gap)this.bricks.push({x:col*.116+.037,y:.1,tone:this.rows%6+1});
+    this.rows++;
   }
   action(key){
     if(this.over)return;
@@ -58,15 +78,23 @@ export class Arcade{
       const previous=this.turns.at(-1)??this.dir;
       if(d&&this.turns.length<2&&(d.x!==-previous.x||d.y!==-previous.y)&&(d.x!==previous.x||d.y!==previous.y)){this.turns.push(d);this.queued=d;}
     }else if(this.kind==='merge'&&['left','right','up','down'].includes(key)){
+      if(this.mergeAge<mergeDuration){if(this.mergeQueue.length<2)this.mergeQueue.push(key);return;}
       const old=JSON.stringify(this.board),vertical=key==='up'||key==='down',reverse=key==='right'||key==='down';
+      this.tiles=[];this.merges=[];
       for(let i=0;i<4;i++){
-        let line=Array.from({length:4},(_,j)=>vertical?this.board[j][i]:this.board[i][j]);if(reverse)line.reverse();
-        const result=mergeLine(line);if(reverse)result.line.reverse();this.score+=result.score;
-        for(let j=0;j<4;j++)if(vertical)this.board[j][i]=result.line[j];else this.board[i][j]=result.line[j];
+        const point=j=>vertical?{x:i,y:reverse?3-j:j}:{x:reverse?3-j:j,y:i};
+        const cells=Array.from({length:4},(_,j)=>{const p=point(j);return {...p,value:this.board[p.y][p.x]};}).filter(c=>c.value);
+        const line=Array(4).fill(0);let target=0;
+        for(let j=0;j<cells.length;j++,target++){
+          const c=cells[j],p=point(target);line[target]=c.value;
+          this.tiles.push({fromX:c.x,fromY:c.y,...p,value:c.value});
+          if(c.value===cells[j+1]?.value){const next=cells[++j];line[target]*=2;this.score+=line[target];this.tiles.push({fromX:next.x,fromY:next.y,...p,value:next.value});this.merges.push(p);}
+        }
+        for(let j=0;j<4;j++){const p=point(j);this.board[p.y][p.x]=line[j];}
       }
-      if(JSON.stringify(this.board)!==old){this.moves++;this.addTile();}
-      if(this.board.flat().includes(2048)){this.won=true;this.over=true;}
-      else if(this.board.every((r,y)=>r.every((v,x)=>v&&v!==r[x+1]&&v!==this.board[y+1]?.[x])))this.over=true;
+      if(JSON.stringify(this.board)!==old){this.moves++;this.addTile();this.mergeAge=0;}
+      if(this.board.flat().some(v=>v>=2048))this.won=true;
+      if(this.board.every((r,y)=>r.every((v,x)=>v&&v!==r[x+1]&&v!==this.board[y+1]?.[x])))this.over=true;
     }else if(this.kind==='bricks'){
       if(key==='space')this.serving=false;
       if(key==='left')this.paddle=clamp(this.paddle-.045,.1,.9);
@@ -75,20 +103,23 @@ export class Arcade{
   }
   flip(i){
     if(this.kind!=='pairs'||this.over||this.reveal||i<0||i>=16||this.open.includes(i)||this.matched.includes(i))return;
+    this.flips++;this.score=Math.max(0,200+this.matched.length/2*100-this.flips*5);
     this.open.push(i);
     if(this.open.length===2){
       this.moves++;
-      if(this.cards[this.open[0]]===this.cards[this.open[1]]){this.matched.push(...this.open);this.open=[];this.score+=100;if(this.matched.length===16){this.score+=Math.max(0,1200-this.moves*30-Math.floor(this.time)*3);this.won=this.over=true;}}
+      if(this.cards[this.open[0]]===this.cards[this.open[1]]){this.matched.push(...this.open);this.open=[];this.score=Math.max(0,200+this.matched.length/2*100-this.flips*5);if(this.matched.length===16){this.score=Math.max(0,1400-this.flips*5);this.won=this.over=true;}}
       else this.reveal=.8;
     }
   }
   update(dt){
-    if(this.over)return;dt=clamp(dt,0,.1);this.time+=dt;this.tick+=dt;
-    if(this.kind==='blocks'&&this.tick>=Math.max(.12,.75-Math.floor(this.lines/10)*.065)){this.tick=0;this.drop();}
+    dt=clamp(dt,0,.1);
+    if(this.kind==='merge'){this.mergeAge=Math.min(mergeDuration,this.mergeAge+dt);if(!this.over&&this.mergeAge>=mergeDuration&&this.mergeQueue.length)this.action(this.mergeQueue.shift());}
+    if(this.over)return;this.time+=dt;this.tick+=dt;
+    if(this.kind==='blocks'&&this.tick>=blockInterval(this.time,this.lines,this.pieces)){this.tick=0;this.drop();}
     if(this.kind==='snake'&&this.tick>=Math.max(.065,.17-this.score*.00012)){
-      this.tick=0;this.dir=this.turns.shift()??this.dir;const head={x:this.snake[0].x+this.dir.x,y:this.snake[0].y+this.dir.y},eat=head.x===this.food.x&&head.y===this.food.y;
+      this.tick=0;this.dir=this.turns.shift()??this.dir;const head={x:(this.snake[0].x+this.dir.x+16)%16,y:(this.snake[0].y+this.dir.y+16)%16},eat=head.x===this.food.x&&head.y===this.food.y;
       const body=eat?this.snake:this.snake.slice(0,-1);
-      if(head.x<0||head.x>=16||head.y<0||head.y>=16||body.some(p=>p.x===head.x&&p.y===head.y)){this.over=true;return;}
+      if(body.some(p=>p.x===head.x&&p.y===head.y)){this.over=true;return;}
       this.snake.unshift(head);if(!eat)this.snake.pop();
       else{this.score+=10;const empty=[];for(let y=0;y<16;y++)for(let x=0;x<16;x++)if(!this.snake.some(p=>p.x===x&&p.y===y))empty.push({x,y});if(!empty.length)this.won=this.over=true;else this.food=empty[Math.floor(this.random()*empty.length)];}
     }
@@ -96,18 +127,22 @@ export class Arcade{
     if(this.kind==='bricks'){
       this.paddle=clamp(this.paddle+this.axis*dt*.9,.1,.9);
       if(this.serving){this.ball.x=this.paddle;this.ball.y=.84;return;}
+      this.activeTime+=dt;
+      const descend=.048/this.rowInterval*dt;this.rowTravel+=descend;this.bricks.forEach(b=>b.y+=descend);
+      if(this.rowTravel>=.048||!this.bricks.length){this.rowTravel=0;this.addBrickRow();}
+      if(this.bricks.some(b=>b.y+.036>=.80)){this.over=true;return;}
       const n=Math.ceil(dt*240),h=dt/n,b=this.ball;
+      const speed=this.ballSpeed,length=Math.hypot(b.vx,b.vy)||1;b.vx*=speed/length;b.vy*=speed/length;
       for(let step=0;step<n;step++){
         const oldX=b.x,oldY=b.y;b.x+=b.vx*h;b.y+=b.vy*h;
         if(b.x<.015){b.x=.015;b.vx=Math.abs(b.vx);}if(b.x>.985){b.x=.985;b.vx=-Math.abs(b.vx);}if(b.y<.02){b.y=.02;b.vy=Math.abs(b.vy);}
-        if(b.vy>0&&oldY<.865&&b.y>=.865&&Math.abs(b.x-this.paddle)<.115){const offset=(b.x-this.paddle)/.115;b.vx=offset*.55;b.vy=-Math.sqrt(.65**2-b.vx**2);b.y=.864;}
-        for(let i=0;i<40;i++)if(this.bricks[i]){
-          const x=(i%8)*.116+.037,y=Math.floor(i/8)*.048+.10;
+        if(b.vy>0&&oldY<.865&&b.y>=.865&&Math.abs(b.x-this.paddle)<.115){const offset=clamp((b.x-this.paddle)/.115,-1,1);b.vx=offset*speed*.85;b.vy=-Math.sqrt(speed**2-b.vx**2);b.y=.864;}
+        for(let i=0;i<this.bricks.length;i++){
+          const {x,y}=this.bricks[i];
           if(b.x>x-.015&&b.x<x+.11+.015&&b.y>y-.015&&b.y<y+.036+.015){
-            this.bricks[i]=0;this.score+=25;if(oldX<=x-.015||oldX>=x+.125)b.vx*=-1;else b.vy*=-1;break;
+            this.bricks.splice(i,1);this.hits++;this.score+=25;if(oldX<=x-.015||oldX>=x+.125)b.vx*=-1;else b.vy*=-1;break;
           }
         }
-        if(!this.bricks.some(Boolean)){this.won=this.over=true;this.score+=this.lives*100;break;}
         if(b.y>1.03){this.lives--;if(!this.lives)this.over=true;else{this.serving=true;this.ball={x:this.paddle,y:.84,vx:.3,vy:-.52};}break;}
       }
     }

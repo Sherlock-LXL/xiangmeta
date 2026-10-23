@@ -2,7 +2,7 @@ import * as T from 'three';
 import type {Catalog} from '../core/types';
 import type {Obstacle} from './scenery';
 import {gameCatalog,makeCourse,createRace,advanceRace,raceGrade,readBest,saveBest,formatTime,createVehicle,advanceVehicle,resetRaceVehicle,thermals,angleDiff} from '../../shared/seasonal-games.mjs';
-import {arcadeCatalog} from '../../shared/arcade.mjs';
+import {arcadeCatalog,arcadeScoreKey} from '../../shared/arcade.mjs';
 import {LivingNavigation} from '../../shared/living-navigation.mjs';
 import {seededRandom} from '../../shared/living-catalog.mjs';
 import {groundHeight} from '../../shared/terrain-height.mjs';
@@ -15,7 +15,7 @@ import '../games.css';
 type Point={x:number;y:number;z:number};
 type Stall={id:string;name:string;x:number;y:number;z:number;approach:{x:number;z:number}};
 type Hooks={lock:()=>void;arrive:(x:number,z:number,tx:number,tz:number)=>void;dynamic:()=>Obstacle[];sound:()=>void};
-const directionCodes=['KeyW','KeyS','KeyA','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ShiftLeft','ShiftRight'];
+const directionCodes=['KeyW','KeyS','KeyA','KeyD','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ShiftLeft','ShiftRight'];
 export class SeasonalGames{
   private stalls:Stall[]=[];private roots:T.Group[]=[];private releases:(()=>void)[]=[];
   private prompt=document.createElement('button');private dialog=document.createElement('dialog');private hud=document.createElement('div');
@@ -27,6 +27,7 @@ export class SeasonalGames{
   private paused=false;private near:Stall|null=null;private time=0;private uiTime=0;private cameraReady=false;private loading=0;
   private lastFrame=performance.now();
   private navigation:LivingNavigation;
+  private courses=new Map<string,ReturnType<typeof makeCourse>>();
   private storage:Storage;private returnFocus:HTMLElement|null=null;private blocked=false;
   constructor(private scene:T.Scene,private host:HTMLElement,private data:Catalog,obstacles:Obstacle[],reserved:{x:number;z:number;radius:number}[],private hooks:Hooks){
     try{this.storage=localStorage;}catch{this.storage={getItem:()=>null,setItem:()=>{throw Error('storage unavailable');}} as unknown as Storage;}
@@ -51,8 +52,8 @@ export class SeasonalGames{
       obstacles.push({x:p.x,z:p.z,radius:1.48,height:p.y+2.7});
       reserved.push({...p,radius:2.05},{...approach,radius:1.15});this.scene.add(root);this.roots.push(root);this.releases.push(batchStatic(root));
       this.stalls.push({...p,id:spec.id,name:spec.name,approach});
-      if(spec.id!=='winter')reserved.push({...makeCourse(spec.id,data.regions).spawn,radius:1.6});
     }
+    for(const id of ['spring','summer','autumn']){const course=makeCourse(id,data.regions,obstacles);this.courses.set(id,course);reserved.push({...course.spawn,radius:1.6});}
     this.navigation=new LivingNavigation(data.regions,obstacles);
     this.prompt.className='game-near-prompt';this.prompt.hidden=true;this.prompt.onclick=()=>{if(this.near)this.open(this.near.id);};host.append(this.prompt);
     this.dialog.className='seasonal-dialog';this.dialog.setAttribute('aria-label','四季游乐');document.body.append(this.dialog);
@@ -89,8 +90,8 @@ export class SeasonalGames{
   open(id?:string){
     if(this.busy)return;this.loading++;this.hooks.lock();
     this.show(this.heading('FOUR SEASONS / 玩在山海之间','四季游乐','一条山径，一片海，一阵风，还有一间温暖的游艺室。')+`<div class="seasonal-cards">${gameCatalog.map(s=>{
-      const course=s.id==='winter'?null:makeCourse(s.id,this.data.regions),best=course?readBest(this.storage,`race.${s.id}.${course.version}`):null;
-      return `<article class="seasonal-card${id===s.id?' current':''}" style="--game-accent:${s.color}"><span>${s.tag}</span><h3>${s.name}</h3><p>${s.description}</p><small>${s.vehicle}${course?` · 两圈 · 最佳 ${formatTime(best??Infinity)}`:' · 5 款 · 本地纪录'}</small><div>${course?`<button data-start="${s.id}">计时挑战</button><button data-free="${s.id}">自由漫游</button>`:'<button data-arcade>进入游艺室</button>'}</div></article>`;
+      const course=this.courses.get(s.id),best=course?readBest(this.storage,`race.${s.id}.${course.version}`):null;
+      return `<article class="seasonal-card${id===s.id?' current':''}" style="--game-accent:${s.color}"><span>${s.tag}</span><h3>${s.name}</h3><p>${s.description}</p><small>${s.vehicle}${course?` · ${Math.round(course.length)} m / 圈 · 两圈 · 最佳 ${formatTime(best??Infinity)}`:' · 5 款 · 本地纪录'}</small><div>${course?`<button data-start="${s.id}">计时挑战</button><button data-free="${s.id}">自由漫游</button>`:'<button data-arcade>进入游艺室</button>'}</div></article>`;
     }).join('')}</div><p class="game-footnote">靠近岛上的游乐摊位，按 V 也能开始。挑战按顺序穿过信标，两圈结束；R 复位加 5 秒。</p>`);
     this.dialog.querySelector('[data-close]')!.addEventListener('click',()=>this.close());
     this.dialog.querySelectorAll<HTMLButtonElement>('[data-start],[data-free]').forEach(b=>b.onclick=()=>this.start(b.dataset.start??b.dataset.free!,!!b.dataset.free));
@@ -99,7 +100,7 @@ export class SeasonalGames{
   private close(){this.loading++;this.arc?.dispose();this.arc=undefined;this.dialog.close();this.mark();if(this.returnFocus?.isConnected)this.returnFocus.focus({preventScroll:true});}
   private arcadeMenu(){
     this.loading++;this.arc?.dispose();this.arc=undefined;
-    this.show(this.heading('WINTER / 雪夜游艺室','留一局给冬天','选择一台街机。所有游戏都支持键盘与触屏。')+`<div class="arcade-menu">${arcadeCatalog.map(g=>`<button data-game="${g.id}"><i>${g.symbol}</i><span><b>${g.name}</b><small>${g.detail}</small><em>最佳 ${readBest(this.storage,'arcade.'+g.id)??'—'} 分</em></span><span>→</span></button>`).join('')}</div>`);
+    this.show(this.heading('WINTER / 雪夜游艺室','留一局给冬天','选择一台街机。所有游戏都支持键盘与触屏。')+`<div class="arcade-menu">${arcadeCatalog.map(g=>`<button data-game="${g.id}"><i>${g.symbol}</i><span><b>${g.name}</b><small>${g.detail}</small><em>最佳 ${readBest(this.storage,arcadeScoreKey(g.id))??'—'} 分</em></span><span>→</span></button>`).join('')}</div>`);
     this.dialog.querySelector('[data-close]')!.addEventListener('click',()=>this.close());
     this.dialog.querySelectorAll<HTMLButtonElement>('[data-game]').forEach(b=>b.onclick=async()=>{
       const request=++this.loading;b.disabled=true;
@@ -111,7 +112,7 @@ export class SeasonalGames{
   private start(id:string,leisure:boolean){
     const stall=this.stalls.find(s=>s.id===id)!;
     this.hooks.arrive(stall.approach.x,stall.approach.z,stall.x,stall.z);
-    this.race=createRace(makeCourse(id,this.data.regions),leisure);this.vehicle=createVehicle(id,this.race.course.spawn);
+    this.race=createRace(this.courses.get(id)!,leisure);this.vehicle=createVehicle(id,this.race.course.spawn);
     this.lastFrame=performance.now();
     this.rig=gameVehicle(id);this.scene.add(this.rig.root);this.cameraReady=false;this.paused=false;this.close();this.buildRoute();
     this.trail=new T.InstancedMesh(new T.SphereGeometry(1,6,4),new T.MeshBasicMaterial({color:id==='spring'?'#d3b994':id==='summer'?'#e9f4e9':'#f0d999',transparent:true,opacity:.65,depthWrite:false}),80);
@@ -119,6 +120,10 @@ export class SeasonalGames{
     const spec=gameCatalog.find(s=>s.id===id)!;
     this.hud.innerHTML=`<div class="game-instruments"><div><small>${spec.tag} / ${leisure?'自由漫游':'两圈挑战'}</small><b>${spec.name}</b></div><strong data-time>00:00.00</strong><span data-lap></span><span data-speed></span><div class="game-boost"><i></i></div><button data-pause aria-label="暂停游戏">Ⅱ</button></div><div class="game-navigation"><span data-direction>◇</span><b data-target></b><small data-notice></small></div><div class="game-countdown" aria-live="polite"></div><div class="game-route-map"><canvas width="170" height="140" aria-label="赛道与当前位置"></canvas></div><div class="game-drive-help">${spec.controls}<br>R 复位${leisure?'':' +5 秒'} · P / Esc 暂停</div><div class="game-touch-drive" aria-label="载具触屏控制"><div><button data-drive="left" aria-label="向左转">←</button><button data-drive="right" aria-label="向右转">→</button></div><div><button data-drive="brake">刹车</button>${id==='autumn'?'<button data-drive="back">抬升</button><button data-drive="forward">俯冲</button>':'<button data-drive="boost">冲刺</button><button data-drive="back">倒车</button><button data-drive="forward">油门</button>'}</div></div>`;
     this.hud.querySelector('[data-pause]')!.addEventListener('click',()=>this.pause());
+    if(id==='spring'){
+      const drift=this.hud.querySelector<HTMLButtonElement>('[data-drive="boost"]')!;drift.dataset.drive='drift';drift.textContent='漂移';
+      drift.insertAdjacentHTML('afterend','<button data-drive="boost">加速</button>');
+    }
     this.hud.querySelectorAll<HTMLButtonElement>('[data-drive]').forEach(b=>{
       b.addEventListener('pointerdown',e=>{e.preventDefault();if(e.button!==0||this.paused)return;b.setPointerCapture(e.pointerId);this.touch.set(e.pointerId,b.dataset.drive!);});
       const release=(e:PointerEvent)=>this.touch.delete(e.pointerId);b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release);
@@ -214,17 +219,18 @@ export class SeasonalGames{
     const s=this.vehicle,race=this.race,canMove=!this.paused&&!externalPaused&&!race.finished,previous={x:s.x,y:s.y,z:s.z};
     if(externalPaused)this.clearInput();
     const pressed=(action:string,...keys:string[])=>[...this.touch.values()].includes(action)||keys.some(k=>this.keys.has(k));
-    const input={throttle:Number(pressed('forward','KeyW','ArrowUp'))-Number(pressed('back','KeyS','ArrowDown')),turn:Number(pressed('left','KeyA','ArrowLeft'))-Number(pressed('right','KeyD','ArrowRight')),brake:pressed('brake','Space'),boost:pressed('boost','ShiftLeft','ShiftRight')};
+    const input={throttle:Number(pressed('forward','KeyW','ArrowUp'))-Number(pressed('back','KeyS','ArrowDown')),turn:Number(pressed('left','KeyA','ArrowLeft'))-Number(pressed('right','KeyD','ArrowRight')),brake:pressed('brake','Space'),drift:s.kind==='spring'&&pressed('drift','ShiftLeft','ShiftRight'),boost:s.kind==='spring'?pressed('boost','KeyE'):pressed('boost','ShiftLeft','ShiftRight')};
     if(canMove){
       if(race.countdown<=0)advanceVehicle(s,input,dt,this.data.regions,[...this.navigation.nearby(s.x,s.z,7),...(s.kind==='spring'?this.hooks.dynamic():[])],this.time);
       const passed=advanceRace(race,previous,s,raceDelta);if(passed)this.hooks.sound();
       if(s.kind==='autumn'&&s.hit&&!race.finished){this.reset();this.updateHud();return;}
       if(race.finished)this.finish();
     }
-    this.rig.root.position.set(s.x,s.y,s.z);this.rig.root.rotation.y=s.yaw;this.rig.animate(s.speed,reduced?0:s.bank,s.pitch,canMove?dt:0);
+    const visualY=s.y+s.stepOffset;
+    this.rig.root.position.set(s.x,visualY,s.z);this.rig.root.rotation.y=s.yaw;this.rig.animate(s.speed,reduced?0:s.bank,s.pitch,canMove?dt:0);
     this.updateTrail(canMove&&race.countdown<=0?dt:0,reduced);
     const distance=s.kind==='autumn'?10:s.kind==='summer'?8:5,height=s.kind==='autumn'?4:s.kind==='summer'?3.7:2.8;
-    const target=new T.Vector3(s.x-Math.sin(s.yaw)*distance,s.y+height,s.z-Math.cos(s.yaw)*distance);
+    const target=new T.Vector3(s.x-Math.sin(s.yaw)*distance,visualY+height,s.z-Math.cos(s.yaw)*distance);
     if(onGround(target.x,target.z,this.data.regions))target.y=Math.max(target.y,groundHeight(target.x,target.z,this.data.regions)+1.1);
     // Pull the chase camera in front of walls instead of looking through an exhibit.
     for(let i=1;i<=10;i++){
@@ -232,7 +238,7 @@ export class SeasonalGames{
       if([...this.navigation.nearby(x,z,1)].some(o=>y<(o.height??Infinity)&&overlaps(x,z,o,.2))){const f=Math.max(.12,t-.12);target.set(s.x+(target.x-s.x)*f,s.y+height,s.z+(target.z-s.z)*f);break;}
     }
     if(!this.cameraReady){camera.position.copy(target);this.cameraReady=true;}else camera.position.lerp(target,1-Math.exp(-dt*8));
-    camera.lookAt(s.x+Math.sin(s.yaw)*2,s.y+1.1,s.z+Math.cos(s.yaw)*2);
+    camera.lookAt(s.x+Math.sin(s.yaw)*2,visualY+1.1,s.z+Math.cos(s.yaw)*2);
     this.gateMeshes.forEach((m,i)=>{const active=i===race.next;(m.material as T.MeshBasicMaterial).opacity=active?.95:.22;(m.material as T.MeshBasicMaterial).color.set(active?'#ffcc66':'#91aaa0');});
     for(const o of this.routeRoot.children)if(o.name==='thermal'&&!reduced)o.rotation.z+=dt*.16;
     if(this.effects){

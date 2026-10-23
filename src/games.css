@@ -50,6 +50,7 @@
 .game-drive-help{position:absolute;bottom:27px;left:20px;max-width:calc(100% - 220px);font-size:11px;line-height:1.9;padding:10px 14px;border-radius:8px;background:#f6efdfeb;color:#6e624f}
 .game-touch-drive{display:none;position:absolute;bottom:max(20px,env(safe-area-inset-bottom));left:14px;right:14px;justify-content:space-between;gap:16px}
 .game-touch-drive>div{display:flex;align-items:end;gap:7px}
+.game-touch-drive>div:last-child{justify-content:flex-end;flex-wrap:wrap;max-width:calc(100% - 108px)}
 .game-touch-drive button{min-width:48px;min-height:54px;padding:7px;touch-action:none;user-select:none;background:#f4ecdae8;font-size:13px;box-shadow:0 4px 12px #40351b20}
 .arcade-menu{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .arcade-menu>button{display:flex;gap:15px;align-items:center;text-align:left;padding:17px;background:#eee7d8}

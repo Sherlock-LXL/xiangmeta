@@ -85,9 +85,11 @@ function flowerBed(g:T.Group,color:string){
 function restCorner(g:T.Group,x:number,flowers:FlowerPoint[]){
   for(const leg of [-.8,.8])place(g,new T.BoxGeometry(.5,.47,.58),kit.stone(),x+leg,.235,9);
   place(g,new T.BoxGeometry(2.4,.1,.62),kit.timberLight(),x,.52,9);
-  for(let i=0;i<10;i++){const spindle=place(g,new T.BoxGeometry(.035,.42,.035),kit.timber(),x-1.08+i*.24,.78,9.33);spindle.rotation.x=-.25;}
-  place(g,new T.BoxGeometry(2.4,.07,.08),kit.timber(),x,.99,9.42);
-  for(const side of [-1,1])place(g,new T.BoxGeometry(.08,.46,.08),kit.timber(),x+side*1.16,.78,9.36).rotation.x=-.25;
+  // Back posts, spindles and cap share a seat-edge pivot and lean together.
+  const back=new T.Group();back.name='bench-back';back.position.set(x,.54,9.27);back.rotation.x=.25;g.add(back);
+  for(let i=0;i<10;i++)place(back,new T.BoxGeometry(.035,.44,.035),kit.timber(),-1.08+i*.24,.22,0);
+  place(back,new T.BoxGeometry(2.4,.08,.09),kit.timber(),0,.44,0);
+  for(const side of [-1,1])place(back,new T.BoxGeometry(.08,.54,.08),kit.timber(),side*1.16,.20,0);
   const planter=place(g,new T.BoxGeometry(1.6,.5,1.2),kit.stone(),x,.25,11);planter.castShadow=false;
   place(g,new T.BoxGeometry(1.72,.09,1.32),kit.marble(),x,.52,11);place(g,new T.BoxGeometry(1.45,.04,1.05),kit.soil(),x,.57,11);
   for(let n=0;n<18;n++)flowers.push({x:x+Math.sin(n*2.4)*(.15+Math.sqrt(n)*.12),y:.60,z:11+Math.cos(n*2.4)*.4});

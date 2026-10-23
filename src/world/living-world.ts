@@ -12,7 +12,7 @@ import type {Obstacle} from './scenery';
 import type {EventBus,LivingPrompt} from '../core/events';
 
 type Point={x:number;y:number;z:number};
-type Player=Point&{grounded:boolean;vy:number};
+type Player=Point&{grounded:boolean;vy:number;stepOffset?:number};
 type Animal={state:ReturnType<typeof createAnimalState>;rig:ReturnType<typeof animalModel>;hearts:T.Sprite[]};
 type Item=Point&{id:string;kind:string;name:string;radius:number;height:number;root:T.Group;home:Point};
 
@@ -129,7 +129,7 @@ export class LivingWorld{
         a.state.headYaw=turnToward(a.state.headYaw,0,dt);
         a.state.petCooldown=Math.max(0,a.state.petCooldown-dt);a.state.affection=Math.max(0,a.state.affection-dt);
       }else if(dt>0)updateAnimal(a.state,dt,player,this.nav,[...this.occupied(a),...(this.mounted?[{x:player.x,z:player.z,radius:this.mounted.state.radius}]:[])],this.random);
-      const s=a.state;a.rig.root.position.set(s.x,s.y,s.z);a.rig.root.rotation.y=s.yaw;
+      const s=a.state;a.rig.root.position.set(s.x,s.y+(a===this.mounted?(player.stepOffset??0):0),s.z);a.rig.root.rotation.y=s.yaw;
       const cos=Math.cos(s.yaw),sin=Math.sin(s.yaw);
       a.rig.animate(s.walkPhase,reduced?0:Math.min(1,s.velocity*2),s.headYaw,s.mode,s.expression,
         (x,z)=>a===this.mounted&&!player.grounded?0:Math.max(-.18,Math.min(.18,groundHeight(s.x+x*cos+z*sin,s.z-x*sin+z*cos,this.nav.regions)-s.y)),

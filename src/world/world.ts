@@ -294,7 +294,7 @@ export class World {
   visit(m:Exhibit){const s=this.stations.find(s=>s.id===m.id)!;this.focusExhibit(m);this.teleport(s.approach.x,s.approach.z,s.x,s.z);this.runHook(m.id,'onVisit');}
   private runHook(id:string,event:'onVisit'|'onInteract'){try{this.extensions.get(id)?.hooks?.[event]?.();}catch(error){console.warn(`Module hook ${id} failed`,error);}}
   setParameter(id:string,value:number){this.parameters.set(id,value);}
-  private syncCamera(){this.camera.position.set(this.player.x,this.player.y+(this.living?.ride?this.living.ride.seat+.82:EYE_HEIGHT),this.player.z);this.camera.rotation.set(this.look.pitch,this.look.yaw,0,'YXZ');this.host.dataset.feetHeight=this.player.y.toFixed(3);this.host.dataset.grounded=String(this.player.grounded);}
+  private syncCamera(){this.camera.position.set(this.player.x,this.player.y+this.player.stepOffset+(this.living?.ride?this.living.ride.seat+.82:EYE_HEIGHT),this.player.z);this.camera.rotation.set(this.look.pitch,this.look.yaw,0,'YXZ');this.host.dataset.feetHeight=this.player.y.toFixed(3);this.host.dataset.grounded=String(this.player.grounded);}
   private updateLocation(){
     const region=this.data.regions.find(r=>Math.hypot(this.player.x-r.position[0],this.player.z-r.position[1])<r.radius)?.id
       ??'nexus';
