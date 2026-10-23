@@ -59,6 +59,7 @@
 .game-navigation>span{grid-row:span 2;font:25px Georgia,serif;color:#a56f3e}
 .game-navigation b{font-size:12px;font-weight:500;white-space:nowrap;grid-column:2}
 .game-navigation small{font-size:10px;color:#8a775a;white-space:nowrap;grid-column:2}
+.game-navigation>[data-direction][hidden]~b,.game-navigation>[data-direction][hidden]~small{grid-column:1/-1}
 .game-countdown{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);width:154px;min-height:154px;border:1px solid #cfb985;border-radius:50%;background:#f6efdfef;box-shadow:0 8px 32px #54462925;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#866335}
 .game-countdown small{font-size:11px;letter-spacing:2px}
 .game-countdown b{font:68px/1 "Songti SC",serif;font-weight:400}
